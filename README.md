@@ -3,9 +3,10 @@
 This API provides user signup, login (with JWT token generation), and retrieval of the authenticated user's username.
 
 ## Install Dependencies
-In a virtual environment, intall following libraries:
-```python
-pip install fastapi uvicorn sqlalchemy passlib[bcrypt] python-jose
+In a virtual environment, install all the dependencies at once, by running:
+
+```bash
+pip install -r requirements.txt
 ```
 
 ## JWT auth endpoints
