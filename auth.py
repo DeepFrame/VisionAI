@@ -25,6 +25,10 @@ class CreateUserRequest(BaseModel):
     email: str
     password: str
 
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
 class TokenData(BaseModel):
     access_token: str
     token_type: str
@@ -50,19 +54,18 @@ async def create_user(db: db_dependency, create_user_request: CreateUserRequest)
     return {"message": "User created successfully"}
 
 @router.post("/login", response_model=TokenData)
-async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], 
-                                 db: db_dependency):
-    print(f"Login attempt for user: {form_data.username}")
-    user = authenticate_user(form_data.username, form_data.password, db)
+async def login_for_access_token(login_request: LoginRequest, db: db_dependency):
+    print(f"Login attempt for user: {login_request.email}")
+    user = authenticate_user(login_request.email, login_request.password, db)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     access_token_expires = timedelta(minutes=30)
     access_token = create_access_token(
-        data={"email": user.email, "password": form_data.password}, expires_delta=access_token_expires
+        data={"email": user.email}, expires_delta=access_token_expires
     )
     print("Access token generated successfully")
     return {"access_token": access_token, "token_type": "bearer"}
@@ -73,8 +76,8 @@ def create_access_token(data: dict, expires_delta: timedelta):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-def authenticate_user(username: str, password: str, db):
-    user = db.query(Users).filter(Users.username == username).first()
+def authenticate_user(email: str, password: str, db):
+    user = db.query(Users).filter(Users.email == email).first()
     if not user:
         print("User not found during authentication")
         return False
@@ -83,4 +86,3 @@ def authenticate_user(username: str, password: str, db):
         return False
     print("User authenticated successfully")
     return user
-
