@@ -11,8 +11,18 @@ from jose import JWTError, jwt
 from auth import SECRET_KEY, ALGORITHM
 
 from models import Users
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # 👈 where frontend runs
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(auth.router)
 
