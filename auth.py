@@ -67,7 +67,8 @@ async def login_for_access_token(login_request: LoginRequest, db: db_dependency)
     access_token = create_access_token(
         data={"email": user.email}, expires_delta=access_token_expires
     )
-    print("Access token generated successfully")
+    print("Access token generated successfully for user:", user.email)
+    print("Access token:", access_token)
     return {"access_token": access_token, "token_type": "bearer"}
 
 def create_access_token(data: dict, expires_delta: timedelta):
