@@ -18,7 +18,7 @@ This document details the face recognition pipeline implemented in the Immich ph
   - 📝 Assign a name to a recognized face  
   - 🎂 Enter date of birth  
   - 🔀 Merge people if incorrectly recognized  
-  - 🙈 Hide people from the explorer view
+  - 👁️‍🗨️ Hide people from the explorer view
 
 - 📤 **Sharing Photos**  
   Easily share your photos or albums with others.
