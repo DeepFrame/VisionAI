@@ -33,9 +33,12 @@ This document details the face recognition pipeline implemented in the Immich ph
 4. Embeddings Indexing  
 5. Clustering  
 
-| ![Flowchart of IMMICH Pipeline](immich_face_flow.svg) |
-|:--:|
-| **Figure 1:** Flowchart of IMMICH Workflow Pipeline. |
+<p align="center">
+  <img src="immich_face_flow.svg" alt="Flowchart of IMMICH Pipeline" width="600">
+</p>
+
+<p align="center"><em>Figure 1: Flowchart of IMMICH Workflow Pipeline</em></p>
+
 
 ---
 
