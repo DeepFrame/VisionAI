@@ -18,7 +18,7 @@ This document details the face recognition pipeline implemented in the Immich ph
   - 📝 Assign a name to a recognized face  
   - 🎂 Enter date of birth  
   - 🔀 Merge people if incorrectly recognized  
-  - 👁️‍🗨️ Hide people from the explorer view
+  - 🙈 Hide people from the explorer view
 
 - 📤 **Sharing Photos**  
   Easily share your photos or albums with others.
@@ -33,12 +33,9 @@ This document details the face recognition pipeline implemented in the Immich ph
 4. Embeddings Indexing  
 5. Clustering  
 
-<p align="center">
-  <img src="immich_face_flow.svg" alt="Flowchart of IMMICH Pipeline" width="600">
-</p>
-
-<p align="center"><em>Figure 1: Flowchart of IMMICH Workflow Pipeline</em></p>
-
+| ![Flowchart of IMMICH Pipeline](immich_face_flow.svg) |
+|:--:|
+| **Figure 1:** Flowchart of IMMICH Workflow Pipeline. |
 
 ---
 
@@ -47,7 +44,7 @@ This document details the face recognition pipeline implemented in the Immich ph
 - **Model Used:** ONNX Face Detection Model – RetinaFace (InsightFace model conceptually similar to SSD)
 - **Architecture:** Uses a Feature Pyramid Network (FPN) to predict dense facial landmarks.
 - **Function:** Detects faces in the input image and returns bounding boxes, confidence scores, and facial landmarks.
-- **Post-processing:** Applies Non-Maximum Suppression (NMS) and filters detections using a confidence threshold.
+- **Post-processing:** Applies filters detections using a confidence threshold.
 
 ---
 
