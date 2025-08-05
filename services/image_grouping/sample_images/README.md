@@ -4,7 +4,7 @@
 |-------------------|----------------------------------------|
 | `news.jpg`        | Single person              |
 | `conference.jpg`  | Group photo   |
-| `interview.jpg`   | Single person       |
+| `interview.jpg`   | Group photo       |
 
 > Group photos may contain multiple faces.
 > 
