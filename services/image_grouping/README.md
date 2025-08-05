@@ -63,6 +63,76 @@ These are referenced in both `MediaFile` and `MediaItems` with `IsFacesExtracted
 
 ---
 
+## 🧾 Manual Steps for Inserting Data Using SSMS
+
+Follow these steps to manually create the database, tables, and insert sample data using **SQL Server Management Studio (SSMS 2022)**.
+
+---
+
+### 🔧 Step 1: Create the Database
+
+```sql
+CREATE DATABASE MetaData;
+```
+
+---
+
+### 🧱 Step 2: Create the Tables
+
+```sql
+USE MetaData;
+
+-- Create MediaFile table
+create table dbo.MediaFile (
+    Id INT PRIMARY KEY,
+    FilePath NVARCHAR(260) NOT NULL,
+    FileName NVARCHAR(100) NOT NULL,
+    MediaType NVARCHAR(10) NOT NULL,
+    ThumbnailId INT NULL 
+);
+
+-- Create MediaItems table
+create table dbo.MediaItems (
+    Id INT PRIMARY KEY,
+    MediaFileId INT NOT NULL,
+    FileName NVARCHAR(100) NOT NULL,
+    IsFacesExtracted BIT NOT NULL DEFAULT 0,
+    FacesExtractedOn DATETIME NULL,
+    FOREIGN KEY (MediaFileId) REFERENCES dbo.MediaFile(Id)
+);
+```
+
+---
+
+### 📥 Step 3: Insert Sample Data
+
+```sql
+use MetaData;
+
+INSERT INTO dbo.MediaFile (Id, FilePath, FileName, MediaType, ThumbnailId)
+VALUES 
+(1, 'C:/Users/ADMIN/Downloads/FRS_ml/sample_images/news.jpg', 'news.jpg', 'image', NULL),
+(2, 'C:/Users/ADMIN/Downloads/FRS_ml/sample_images/conference.jpg', 'conference.jpg', 'image', NULL),
+(3, 'C:/Users/ADMIN/Downloads/FRS_ml/sample_images/interview.jpg', 'interview.jpg', 'image', NULL);
+
+INSERT INTO dbo.MediaItems (Id, MediaFileId, FileName, IsFacesExtracted, FacesExtractedOn)
+VALUES 
+(1, 1, 'news.jpg', 0, NULL),
+(2, 2, 'conference.jpg', 0, NULL),
+(3, 3, 'interview.jpg', 0, NULL);
+```
+
+---
+
+### 🔎 Step 4: Verify Data
+```sql
+SELECT * FROM dbo.MediaFile;
+```
+
+```sql
+SELECT * FROM dbo.MediaItems;
+```
+---
 ## 🛠️ Prerequisites
 
 Before running the script, ensure you have:
