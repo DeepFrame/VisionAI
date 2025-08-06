@@ -191,4 +191,6 @@ Before running the script, ensure you have:
 | Image Folder        | Local folder containing test images (see below) |
 
 Example path used for this setup:
-`C:/Users/ADMIN/Downloads/FRS_ml/sample_images/`
+> `C:/Users/ADMIN/Downloads/FRS_ml/sample_images/`
+> 
+> `C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/`
