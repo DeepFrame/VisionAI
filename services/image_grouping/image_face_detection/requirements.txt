@@ -1,0 +1,8 @@
+numpy
+pyodbc
+opencv_python
+retina-face
+tabulate
+python-dotenv
+pandas
+openpyxl
