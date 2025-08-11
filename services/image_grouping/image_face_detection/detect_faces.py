@@ -172,7 +172,7 @@ def detect_and_crop_faces(image_path, media_item_id=None):
         for idx, (key, face_data) in enumerate(faces.items()):
             landmarks = face_data["landmarks"]
             
-            aligned = align_face(img, landmarks, margin=0.1)
+            aligned = align_face(img, landmarks, margin=0.125)
 
             aligned_resized = cv2.resize(aligned, (112, 112), interpolation=cv2.INTER_AREA)
 
