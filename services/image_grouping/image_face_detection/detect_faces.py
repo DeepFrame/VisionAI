@@ -109,6 +109,52 @@ def countdown_timer(seconds, message="Waiting"):
         time.sleep(1)
     sys.stdout.write("\r" + " " * 50 + "\r")
 
+# CROP & ALIGN with Surroundings
+def align_face(image, landmarks, margin=0.1):
+    eye1 = landmarks['right_eye']
+    eye2 = landmarks['left_eye']
+
+    if eye1[0] < eye2[0]:
+        left_eye = eye1
+        right_eye = eye2
+    else:
+        left_eye = eye2
+        right_eye = eye1
+
+    eyes_center = ((left_eye[0] + right_eye[0]) / 2,
+                   (left_eye[1] + right_eye[1]) / 2)
+
+    dy = right_eye[1] - left_eye[1]
+    dx = right_eye[0] - left_eye[0]
+    angle = np.degrees(np.arctan2(dy, dx))
+
+    desired_width = 256
+    desired_height = 256
+
+    margin_factor = 1 + margin
+    desired_width_margin = int(desired_width * margin_factor)
+    desired_height_margin = int(desired_height * margin_factor)
+
+    desired_left_eye = (0.35, 0.4)
+
+    dist = np.sqrt(dx ** 2 + dy ** 2)
+    desired_dist = (1.0 - 2 * desired_left_eye[0]) * desired_width
+    scale = desired_dist / dist
+
+    scale /= margin_factor
+
+    M = cv2.getRotationMatrix2D(eyes_center, angle, scale)
+
+    tX = desired_width_margin * 0.5
+    tY = desired_height_margin * desired_left_eye[1]
+    M[0, 2] += (tX - eyes_center[0])
+    M[1, 2] += (tY - eyes_center[1])
+
+    aligned_face = cv2.warpAffine(image, M, (desired_width_margin, desired_height_margin),
+                                  flags=cv2.INTER_CUBIC)
+
+    return aligned_face
+
 # FACE DETECTION (RetinaFace)
 def detect_and_crop_faces(image_path, media_item_id=None):
     try:
@@ -124,14 +170,20 @@ def detect_and_crop_faces(image_path, media_item_id=None):
         ext = ext.lower() if ext else ".jpg"
 
         for idx, (key, face_data) in enumerate(faces.items()):
-            facial_area = face_data["facial_area"]
-            x1, y1, x2, y2 = map(int, facial_area)
-            cropped = img[y1:y2, x1:x2]
+            landmarks = face_data["landmarks"]
+            
+            aligned = align_face(img, landmarks, margin=0.1)
+
+            aligned_resized = cv2.resize(aligned, (112, 112), interpolation=cv2.INTER_AREA)
+
+            if aligned_resized.shape[0] < 112 or aligned_resized.shape[1] < 112:
+                print(f"[WARN] Face {idx+1} in {image_path} is too small after alignment. Skipping.")
+                continue
 
             filename = f"{name_without_ext}_TN{idx + 1}{ext}"
             save_path = os.path.join(thumbnail_base_path, filename)
-            cv2.imwrite(save_path, cropped)
-            print(f"[INFO] Saved face {idx+1} to {save_path}")
+            cv2.imwrite(save_path, aligned_resized)
+            print(f"[INFO] Saved aligned face {idx+1} to {save_path}")
 
             if media_item_id is not None:
                 update_database(media_item_id, filename, save_path)
@@ -207,6 +259,7 @@ def continuous_batch_process():
 # Test Detection and Cropping (Single file)
 def test_detect_and_crop_faces(image_path, media_item_id=None):
     try:
+        save_path = ''.join([thumbnail_base_path, os.path.basename(image_path)])
         faces = RetinaFace.detect_faces(image_path)
         img = cv2.imread(image_path)
 
@@ -215,14 +268,20 @@ def test_detect_and_crop_faces(image_path, media_item_id=None):
             return False
 
         for idx, (key, face_data) in enumerate(faces.items()):
-            facial_area = face_data["facial_area"]
-            x1, y1, x2, y2 = map(int, facial_area)
-            cropped = img[y1:y2, x1:x2]
+            landmarks = face_data["landmarks"]
+            
+            aligned = align_face(img, landmarks, margin=0.1)
+
+            aligned_resized = cv2.resize(aligned, (112, 112), interpolation=cv2.INTER_AREA)
+
+            if aligned_resized.shape[0] < 112 or aligned_resized.shape[1] < 112:
+                print(f"[WARN] Face {idx+1} in {image_path} is too small after cropping. Skipping.")
+                continue
 
             filename = f"thumb_{media_item_id or 'manual'}_{idx+1}_{int(time.time())}.jpg"
-            save_path = os.path.join(thumbnail_base_path, filename)
-            cv2.imwrite(save_path, cropped)
-            print(f"[INFO] Saved face {idx+1} to {save_path}")
+            cv2.imwrite(os.path.join(thumbnail_base_path, filename), aligned_resized)
+
+            print(f"[INFO] Saved face {idx+1} to {filename}")
 
             if media_item_id is not None:
                 update_database(media_item_id, filename, save_path)
