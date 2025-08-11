@@ -20,6 +20,14 @@ Build a Python script that:
    - Set `FacesExtractedOn = CURRENT_TIMESTAMP`
    - Store thumbnail metadata in `ThumbnailStorage` table
 
+---
+
+### 👁️‍🗨️ Cropped Faces Thumbnails
+
+![Thumbnails](Thumbnails.jpeg)
+
+*Cropped Faces Thumbnails that are saved to the `Thumbnails/` directory.*
+---
 ## 📂 Project Structure
 ```python
 services/image_grouping/image_face_detection/
