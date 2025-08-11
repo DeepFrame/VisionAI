@@ -9,8 +9,12 @@ Build a Python script that:
 
 ## 🔄 Workflow Summary
 1. Connect to database and query media items where `IsFacesExtracted = FALSE`
-2. Use RetinaFace model to detect faces in each image
-3. Save cropped face thumbnails in `thumbnails/` directory
+2. For each media file:
+   - Detect faces using RetinaFace
+   - Align, crop, and resize faces to 112x112 thumbnails
+   - Save thumbnails to configured `thumbnails/` directory
+   - Update database marking the media item as processed and save thumbnail info
+3. Repeat periodically for continuous processing
 4. Update database:
    - Set `IsFacesExtracted = TRUE`
    - Set `FacesExtractedOn = CURRENT_TIMESTAMP`
