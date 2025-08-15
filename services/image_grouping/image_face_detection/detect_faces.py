@@ -11,6 +11,9 @@ from config import SQL_CONNECTION_STRING, THUMBNAIL_SAVE_PATH
 import sys
 import time
 
+import json
+
+# Load environment variables
 conn_str = SQL_CONNECTION_STRING
 thumbnail_base_path = THUMBNAIL_SAVE_PATH
 
@@ -57,48 +60,101 @@ def get_next_thumbnail_id(cursor):
 
     return f"TS{next_num:03d}" 
 
+def get_unassigned_faces():
+    try:
+        conn = pyodbc.connect(conn_str)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT Id, Embedding
+            FROM dbo.Faces
+            WHERE PersonId IS NULL
+        """)
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return rows
+    except Exception as e:
+        print(f"[ERROR] Could not load unassigned faces: {e}")
+        return []
+    
+def parse_embedding(raw_value):
+    try:
+        if isinstance(raw_value, str):
+            return np.array(json.loads(raw_value), dtype=np.float32)
+        # If stored as varbinary
+        elif isinstance(raw_value, bytes):
+            return np.frombuffer(raw_value, dtype=np.float32)
+        else:
+            raise ValueError("Unknown embedding format")
+    except Exception as e:
+        print(f"[ERROR] Failed to parse embedding: {e}")
+        return None
+
 # DATABASE Update Query Processing
-def update_database(media_item_id, thumbnail_filename, thumbnail_path):
+def update_database(media_item_id, face_bboxes, filename=None):
+    """
+    Inserts detected faces into dbo.Faces (BoundingBox only, no embedding yet).
+    Avoids duplicates for same MediaItemId + BoundingBox.
+    Updates ModifiedAt if duplicate exists.
+    """
     try:
         conn = pyodbc.connect(conn_str)
         cursor = conn.cursor()
 
-        update_query = """
-        UPDATE dbo.MediaItems 
-        SET IsFacesExtracted = 1,
-            FacesExtractedOn = ?
-        WHERE Id = ?
-        """
-        cursor.execute(update_query, datetime.now(), media_item_id)
+        # Update MediaItems status
+        cursor.execute("""
+            UPDATE dbo.MediaItems
+            SET IsFacesExtracted = 1,
+                FacesExtractedOn = ?
+            WHERE Id = ?
+        """, datetime.now(), media_item_id)
 
-        cursor.execute("SELECT MediaFileId FROM dbo.MediaItems WHERE Id = ?", media_item_id)
-        result = cursor.fetchone()
-        if not result:
-            raise Exception("MediaFileId not found")
+        inserted_count = 0
+        updated_count = 0
 
-        media_file_id = result[0]
-        #thumbnail_id = f"TS{int(time.time()) % 100000}"
-        thumbnail_id = get_next_thumbnail_id(cursor)
+        for bbox in face_bboxes:
+            # Ensure bbox is in the correct format [x1, y1, x2, y2]
+            if not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
+                print(f"[WARN] Invalid bounding box format: {bbox}")
+                continue
 
-        insert_query = """
-        INSERT INTO dbo.ThumbnailStorage 
-        (Id, MediaFileId, FileName, ThumbnailPath, CreatedOn)
-        VALUES (?, ?, ?, ?, ?)
-        """
-        cursor.execute(insert_query,
-                       thumbnail_id,
-                       media_file_id,
-                       thumbnail_filename,
-                       thumbnail_path,
-                       datetime.now())
+            try:
+                bbox_norm = [round(float(c), 3) for c in bbox] 
+                bbox_str = json.dumps(bbox_norm) 
+
+                cursor.execute("""
+                    SELECT Id FROM dbo.Faces
+                    WHERE MediaItemId = ? AND BoundingBox = ?
+                """, media_item_id, bbox_str)
+                row = cursor.fetchone()
+
+                if row:
+                    cursor.execute("""
+                        UPDATE dbo.Faces
+                        SET BoundingBox = ?, Name = ?, ModifiedAt = ?
+                        WHERE Id = ?
+                    """, bbox_str, filename, datetime.now(), row[0])
+                    updated_count += 1
+                else:
+                    cursor.execute("""
+                        INSERT INTO dbo.Faces (MediaItemId, BoundingBox, Name, CreatedAt)
+                        VALUES (?, ?, ?, ?)
+                    """, media_item_id, bbox_str, filename, datetime.now())
+                    inserted_count += 1
+            except Exception as e:
+                print(f"[WARN] Failed to process bounding box {bbox}: {e}")
+                continue
 
         conn.commit()
         cursor.close()
         conn.close()
 
-        print(f"[INFO] DB updated for MediaItemId {media_item_id}")
+        print(f"[INFO] Inserted {inserted_count} new face(s), updated {updated_count} existing face(s) for MediaItemId {media_item_id}")
+
     except Exception as e:
         print(f"[ERROR] Database update failed: {e}")
+        if 'conn' in locals():
+            conn.rollback()
 
 # Countdown Timer for Continuous Processing
 def countdown_timer(seconds, message="Waiting"):
@@ -109,91 +165,102 @@ def countdown_timer(seconds, message="Waiting"):
         time.sleep(1)
     sys.stdout.write("\r" + " " * 50 + "\r")
 
-# CROP & ALIGN with Surroundings
-def align_face(image, landmarks, margin=0.1):
-    eye1 = landmarks['right_eye']
-    eye2 = landmarks['left_eye']
+# SQUARE CROP with margin & expansion/shrink
+def process_face_square(img, face, margin_ratio=0.2, target_size=(112, 112)):
+    #score = face.get("score", 0.0)
+    
+    h, w = img.shape[:2]
+    x1, y1, x2, y2 = face["facial_area"]
 
-    if eye1[0] < eye2[0]:
-        left_eye = eye1
-        right_eye = eye2
-    else:
-        left_eye = eye2
-        right_eye = eye1
+    bw = x2 - x1
+    bh = y2 - y1
+    margin_x = int(bw * margin_ratio)
+    margin_y = int(bh * margin_ratio)
 
-    eyes_center = ((left_eye[0] + right_eye[0]) / 2,
-                   (left_eye[1] + right_eye[1]) / 2)
+    x1 = max(0, x1 - margin_x)
+    y1 = max(0, y1 - margin_y)
+    x2 = min(w, x2 + margin_x)
+    y2 = min(h, y2 + margin_y)
 
-    dy = right_eye[1] - left_eye[1]
-    dx = right_eye[0] - left_eye[0]
-    angle = np.degrees(np.arctan2(dy, dx))
+    crop_w = x2 - x1
+    crop_h = y2 - y1
+    if crop_w > crop_h:
+        diff = crop_w - crop_h
+        expand_top = diff // 2
+        expand_bottom = diff - expand_top
+        if y1 - expand_top >= 0 and y2 + expand_bottom <= h:
+            y1 -= expand_top
+            y2 += expand_bottom
+        else:
+            x1 += diff // 2
+            x2 -= (diff - diff // 2)
+    elif crop_h > crop_w:
+        diff = crop_h - crop_w
+        expand_left = diff // 2
+        expand_right = diff - expand_left
+        if x1 - expand_left >= 0 and x2 + expand_right <= w:
+            x1 -= expand_left
+            x2 += expand_right
+        else:
+            y1 += diff // 2
+            y2 -= (diff - diff // 2)
 
-    desired_width = 256
-    desired_height = 256
+    x1, x2 = max(0, x1), min(w, x2)
+    y1, y2 = max(0, y1), min(h, y2)
 
-    margin_factor = 1 + margin
-    desired_width_margin = int(desired_width * margin_factor)
-    desired_height_margin = int(desired_height * margin_factor)
+    cropped_face = img[y1:y2, x1:x2]
 
-    desired_left_eye = (0.35, 0.4)
+    if cropped_face.size == 0:
+        return None, None
 
-    dist = np.sqrt(dx ** 2 + dy ** 2)
-    desired_dist = (1.0 - 2 * desired_left_eye[0]) * desired_width
-    scale = desired_dist / dist
-
-    scale /= margin_factor
-
-    M = cv2.getRotationMatrix2D(eyes_center, angle, scale)
-
-    tX = desired_width_margin * 0.5
-    tY = desired_height_margin * desired_left_eye[1]
-    M[0, 2] += (tX - eyes_center[0])
-    M[1, 2] += (tY - eyes_center[1])
-
-    aligned_face = cv2.warpAffine(image, M, (desired_width_margin, desired_height_margin),
-                                  flags=cv2.INTER_CUBIC)
-
-    return aligned_face
+    resized_face = cv2.resize(cropped_face, target_size, interpolation=cv2.INTER_AREA)
+    updated_bbox = [int(x1), int(y1), int(x2), int(y2)]  
+    return resized_face, updated_bbox
 
 # FACE DETECTION (RetinaFace)
 def detect_and_crop_faces(image_path, media_item_id=None):
     try:
-        faces = RetinaFace.detect_faces(image_path)
         img = cv2.imread(image_path)
+        if img is None:
+            print(f"[ERROR] Could not read image: {image_path}")
+            return False
 
+        faces = RetinaFace.detect_faces(image_path)
         if not isinstance(faces, dict) or len(faces) == 0:
             print(f"[INFO] No faces detected in {image_path}")
-            return None
+            return False
 
         base_name = os.path.basename(image_path)
         name_without_ext, ext = os.path.splitext(base_name)
         ext = ext.lower() if ext else ".jpg"
 
+        bounding_boxes = []
+        
         for idx, (key, face_data) in enumerate(faces.items()):
-            landmarks = face_data["landmarks"]
-            
-            aligned = align_face(img, landmarks, margin=0.125)
-
-            aligned_resized = cv2.resize(aligned, (112, 112), interpolation=cv2.INTER_AREA)
-
-            if aligned_resized.shape[0] < 112 or aligned_resized.shape[1] < 112:
-                print(f"[WARN] Face {idx+1} in {image_path} is too small after alignment. Skipping.")
+            processed_face, bbox = process_face_square(img, face_data, margin_ratio=0.2, target_size=(112, 112))
+            if processed_face is None or bbox is None:
+                print(f"[WARN] Face not found.")
                 continue
 
             filename = f"{name_without_ext}_TN{idx + 1}{ext}"
             save_path = os.path.join(thumbnail_base_path, filename)
-            cv2.imwrite(save_path, aligned_resized)
-            print(f"[INFO] Saved aligned face {idx+1} to {save_path}")
+            
+            try:
+                cv2.imwrite(save_path, processed_face)
+                print(f"[INFO] Saved square face {idx+1} to {save_path}")
+                bounding_boxes.append(bbox)
+            except Exception as e:
+                print(f"[ERROR] Failed to save face {idx+1}: {e}")
 
-            if media_item_id is not None:
-                update_database(media_item_id, filename, save_path)
+        if media_item_id is not None and bounding_boxes:
+            update_database(media_item_id, bounding_boxes, filename)
 
         return True
 
     except Exception as e:
         print(f"[ERROR] Face processing failed for {image_path}: {e}")
         return False
-
+    
 # MAIN BATCH PROCESSOR
 def batch_process_from_db():
     print("[INFO] Starting batch face detection from DB...")
@@ -259,35 +326,31 @@ def continuous_batch_process():
 # Test Detection and Cropping (Single file)
 def test_detect_and_crop_faces(image_path, media_item_id=None):
     try:
-        save_path = ''.join([thumbnail_base_path, os.path.basename(image_path)])
-        faces = RetinaFace.detect_faces(image_path)
         img = cv2.imread(image_path)
+        if img is None:
+            print(f"[ERROR] Could not read image: {image_path}")
+            return False
 
+        faces = RetinaFace.detect_faces(image_path)
         if not isinstance(faces, dict) or len(faces) == 0:
             print(f"[INFO] No faces detected in {image_path}")
             return False
 
         for idx, (key, face_data) in enumerate(faces.items()):
-            landmarks = face_data["landmarks"]
-            
-            aligned = align_face(img, landmarks, margin=0.1)
-
-            aligned_resized = cv2.resize(aligned, (112, 112), interpolation=cv2.INTER_AREA)
-
-            if aligned_resized.shape[0] < 112 or aligned_resized.shape[1] < 112:
-                print(f"[WARN] Face {idx+1} in {image_path} is too small after cropping. Skipping.")
+            processed_face, boundings = process_face_square(img, face_data, margin_ratio=0.2, target_size=(112, 112))
+            if processed_face is None:
+                print(f"[WARN] Face not found.")
                 continue
 
             filename = f"thumb_{media_item_id or 'manual'}_{idx+1}_{int(time.time())}.jpg"
-            cv2.imwrite(os.path.join(thumbnail_base_path, filename), aligned_resized)
-
+            save_path = os.path.join(thumbnail_base_path, filename)
+            cv2.imwrite(save_path, processed_face)
             print(f"[INFO] Saved face {idx+1} to {filename}")
 
-            if media_item_id is not None:
-                update_database(media_item_id, filename, save_path)
-        
-        print(f"[INFO] Successfully processed {len(faces)} faces in {image_path}")
+            if media_item_id is not None and boundings is not None:
+                update_database(media_item_id, boundings, filename)
 
+        print(f"[INFO] Successfully processed {len(faces)} faces in {image_path}")
         return True
 
     except Exception as e:
