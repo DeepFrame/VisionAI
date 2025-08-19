@@ -1,196 +1,131 @@
-# 🧠 Database Preparation & Sample Media Setup
-
-## 📌 Objective
-
-Set up the SQL Server database with initial media file entries to be used later for face detection and grouping. Data was inserted manually using SQL Server Management Studio (SSMS) 21.
+Here’s a polished `README.md` tailored for your GitHub project, highlighting the purpose, installation, usage, and structure of your face recognition system:
 
 ---
 
-## 🗄️ Database: `MetaData`
+# Face Recognition System
 
-This task uses a SQL Server database named `MetaData`.
+This repository provides a **face detection and recognition pipeline** that integrates detection, embedding generation, and clustering of faces. It supports single-image testing, batch processing from a database, continuous monitoring, and automated pipelines for recurring processing.
 
----
+![Face Recognition System](FaceRecognitionSystem.png)
 
-## 📁 Tables
+## Features
 
-### 1. `dbo.MediaFile`
+* **Face Detection:** Detect faces in images or media items stored in a database.
+* **Face Recognition:** Generate embeddings for detected faces and cluster them into distinct persons.
+* **Automated Pipelines:** Run full detection and recognition periodically.
+* **Reclustering:** Recompute clusters for unassigned faces by comparing them against each other or matching them with previously assigned persons.
 
-Stores metadata about media files.
+## Installation
 
-| Column      | Type           | Description                                      |
-|-------------|----------------|--------------------------------------------------|
-| Id          | NVARCHAR(10)   | Unique ID for each media file (e.g., `'MF001'`) |
-| FilePath    | NVARCHAR(255)  | Full file path to the image/video               |
-| FileName    | NVARCHAR(100)  | Name of the media file                          |
-| MediaType   | VARCHAR(10)    | Either `'image'` or `'video'`                   |
+1. Clone the repository:
 
----
-
-### 2. `dbo.ThumbnailStorage`
-
-Stores thumbnails generated for media files.
-
-| Column        | Type           | Description                                      |
-|---------------|----------------|--------------------------------------------------|
-| Id            | NVARCHAR(10)   | Unique ID for each thumbnail (e.g., `'TS001'`)   |
-| MediaFileId   | NVARCHAR(10)   | FK to `MediaFile(Id)`                            |
-| FileName      | NVARCHAR(100)  | Thumbnail filename                               |
-| ThumbnailPath | NVARCHAR(255)  | Full path to the thumbnail file                  |
-| CreatedOn     | DATETIME       | Timestamp when the thumbnail was created         |
-
----
-
-### 3. `dbo.MediaItems`
-
-Tracks face processing status of each media file.
-
-| Column            | Type           | Description                                                               |
-|-------------------|----------------|---------------------------------------------------------------------------|
-| Id                | NVARCHAR(10)   | Unique ID for the media item (e.g., `'MI001'`)                            |
-| MediaFileId       | NVARCHAR(10)   | FK to `MediaFile(Id)`                                                     |
-| FileName          | NVARCHAR(100)  | Redundant name for ease of access                                         |
-| IsFacesExtracted  | BIT            | `0` = not processed, `1` = processed                                      |
-| FacesExtractedOn  | DATETIME       | Timestamp when face extraction was completed (NULL if not processed)      |
-
----
-
-## 🔗 Relationship
-
-- `MediaItems.MediaFileId` → `MediaFile.Id`
-- `ThumbnailStorage.MediaFileId` → `MediaFile.Id`
-- A foreign key constraint ensures referential integrity.
-
----
-
-## 📥 Sample Data Inserted
-
-Three image entries were manually inserted via SSMS:
-
-| File Name         | Path                                                                 |
-|-------------------|----------------------------------------------------------------------|
-| `news.jpg`        | `C:/Users/ADMIN/Downloads/FRS_ml/sample_images/news.jpg`            |
-| `conference.jpg`  | `C:/Users/ADMIN/Downloads/FRS_ml/sample_images/conference.jpg`      |
-| `interview.jpg`   | `C:/Users/ADMIN/Downloads/FRS_ml/sample_images/interview.jpg`       |
-
-These are referenced in both `MediaFile` and `MediaItems` with `IsFacesExtracted = 0/1`.
-
----
-
-## 🧾 Manual Steps for Inserting Data Using SSMS
-
-Follow these steps to manually create the database, tables, and insert sample data using **SQL Server Management Studio (SSMS 2022)**.
-
----
-
-### 🔧 Step 1: Create the Database
-
-```sql
-CREATE DATABASE MetaData;
+```bash
+git clone https://github.com/DeepFrame/deepframe-backend.git
+cd deepframe-backend/services/image_grouping
 ```
 
+2. Install dependencies (recommended to use a virtual environment with Python v3.8.20):
+
+```bash
+pip install -r requirements.txt
+```
+
+3. Configure your database connection in `image_face_detection/config.py`:
+
+```python
+SQL_CONNECTION_STRING = "DRIVER={SQL Server};SERVER=your_server;DATABASE=your_db;UID=user;PWD=password"
+```
+
+4. Ensure your database contains the required tables with required fields:
+
+* `MediaFile`
+* `MediaItems`
+* `Faces`
+* `Persons`
+
+## Usage
+
+The main CLI is `main.py`, supporting multiple modes:
+
+```bash
+python main.py [options]
+```
+
+### Options
+
+| Option                | Description                                                          |
+| --------------------- | -------------------------------------------------------------------- |
+| `--test <image_path>` | Run face detection on a single image.                                |
+| `--db`                | Run face detection on all database media items once.                 |
+| `--watch`             | Continuously monitor and process new media items.                    |
+| `--recognize`         | Generate embeddings and cluster detected faces.                      |
+| `--all`               | Run full pipeline: detection → recognition once.                     |
+| `--automate`          | Run full pipeline every 3 minutes.                                   |
+| `--recluster`         | Rebuild clusters for all faces, ignoring existing PersonId mappings. |
+
+### Examples
+
+1. **Test a single image:**
+
+```bash
+python main.py --test path/to/image.jpg
+```
+
+2. **Process all database media items:**
+
+```bash
+python main.py --db
+```
+
+3. **Run full pipeline once:**
+
+```bash
+python main.py --all
+```
+
+4. **Run automated pipeline every 3 minutes:**
+
+```bash
+python main.py --automate
+```
+
+5. **Recluster all faces:**
+
+```bash
+python main.py --recluster
+```
+
+## Project Structure
+
+```
+.
+├── main.py                     # Entry point for CLI
+├── image_face_detection/       # Face detection module
+│   ├── detect_faces.py         # Face Detection, Cropping and Save thumbnails logic
+│   └── config.py               # Database connection
+│   └── logger_config.py        # Logs Configuration
+│   └── logs/                   # Logs for detection
+├── person_recognition          # Face Recognition Module
+│   ├── recognize_persons.py    # Face embedding and clustering logic
+│   └── logger_config.py        # Logs Configuration
+│   └── logs/                   # Logs for embeddings and clustering 
+├── requirements.txt
+└── README.md
+```
+
+## Logging
+
+* Logs are stored in `logs/embeddings_clustering.log`.
+   - Provides detailed info about embeddings generation and clustering.
+* Logs are stored in `logs/face_detection.log`.
+   - Provides detailed info details of the face-detection pipeline, including processed images, detected faces, database updates, and any errors or warnings.
+
+## Notes
+
+* **FaceNet** is used for embedding generation.
+* **DBSCAN + UMAP** is used for clustering embeddings.
+* **Cosine Similarity** assigns unlabelled faces to known persons if similarity ≥ 0.8.
+* Ensure images are accessible and bounding boxes are valid for proper embedding generation.
+* Reclustering is optional but recommended when significant new faces are added.
+
 ---
-
-### 🧱 Step 2: Create the Tables
-
-```sql
-USE MetaData;
-
--- 1. MediaFile Table
-CREATE TABLE dbo.MediaFile (
-    Id NVARCHAR(10) PRIMARY KEY, -- e.g., 'MF001'
-    FilePath NVARCHAR(255) NOT NULL,
-    FileName NVARCHAR(100) NOT NULL,
-    MediaType VARCHAR(10) CHECK (MediaType IN ('image', 'video')) NOT NULL
-);
-
--- 2. ThumbnailStorage Table
-CREATE TABLE dbo.ThumbnailStorage (
-    Id NVARCHAR(10) PRIMARY KEY, -- e.g., 'TS001'
-    MediaFileId NVARCHAR(10) FOREIGN KEY REFERENCES dbo.MediaFile(Id),
-    FileName NVARCHAR(100) NOT NULL,
-    ThumbnailPath NVARCHAR(255) NOT NULL,
-    CreatedOn DATETIME NOT NULL DEFAULT GETDATE()
-);
-
--- 3. MediaItems Table
-CREATE TABLE dbo.MediaItems (
-    Id NVARCHAR(10) PRIMARY KEY, -- e.g., 'MI001'
-    MediaFileId NVARCHAR(10) FOREIGN KEY REFERENCES dbo.MediaFile(Id),
-    FileName NVARCHAR(100) NOT NULL,
-    IsFacesExtracted BIT NOT NULL DEFAULT 0,
-    FacesExtractedOn DATETIME NULL
-);
-```
-
----
-
-### 📥 Step 3: Insert Sample Data
-
-```sql
-use MetaData;
-
-INSERT INTO dbo.MediaFile (Id, FilePath, FileName, MediaType)
-VALUES 
-('MF001', 'C:/Users/ADMIN/Downloads/FRS_ml/sample_images/conference.jpg', 'conference.jpg', 'image'),
-('MF002', 'C:/Users/ADMIN/Downloads/FRS_ml/sample_images/interview.jpg', 'interview.jpg', 'image'),
-('MF003', 'C:/Users/ADMIN/Downloads/FRS_ml/sample_images/news.jpg', 'news.jpg', 'image');
-
--- Insert media items 
-INSERT INTO dbo.MediaItems (Id, MediaFileId, FileName, IsFacesExtracted, FacesExtractedOn)
-VALUES 
-('MI001', 'MF001', 'conference.jpg', 1, GETDATE()),
-('MI002', 'MF002', 'interview.jpg', 0, NULL),
-('MI003', 'MF003', 'news.jpg', 1, GETDATE());
-
--- Thumbnails for conference.jpg
-INSERT INTO dbo.ThumbnailStorage (Id, MediaFileId, FileName, ThumbnailPath)
-VALUES
-('TS001', 'MF001', 'conference_TN1.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN1.jpg'),
-('TS002', 'MF001', 'conference_TN2.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN2.jpg'),
-('TS003', 'MF001', 'conference_TN3.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN3.jpg'),
-('TS004', 'MF001', 'conference_TN4.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN4.jpg'),
-('TS005', 'MF001', 'conference_TN5.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN5.jpg'),
-('TS006', 'MF001', 'conference_TN6.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN6.jpg'),
-('TS007', 'MF001', 'conference_TN7.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN7.jpg'),
-('TS008', 'MF001', 'conference_TN8.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN8.jpg');
-
--- Thumbnail for news.jpg
-INSERT INTO dbo.ThumbnailStorage (Id, MediaFileId, FileName, ThumbnailPath)
-VALUES
-('TS009', 'MF003', 'news_TN.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/news_TN.jpg');
-```
-
----
-
-### 🔎 Step 4: Verify Data
-```sql
-USE MetaData;
-SELECT * FROM dbo.MediaFile;
-```
-
-```sql
-USE MetaData;
-SELECT * FROM dbo.MediaItems;
-```
-
-```sql
-USE MetaData;
-SELECT * FROM dbo.ThumbnailStorage;
-```
-
----
-## 🛠️ Prerequisites
-
-Before running the script, ensure you have:
-
-| Component           | Required Version |
-|---------------------|------------------|
-| SQL Server          | 2022    |
-| SSMS (Management Studio) | (v21)       |
-| Image Folder        | Local folder containing test images (see below) |
-
-Example path used for this setup:
-> `C:/Users/ADMIN/Downloads/FRS_ml/sample_images/`
-> 
-> `C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/`
