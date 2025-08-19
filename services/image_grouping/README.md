@@ -1,7 +1,3 @@
-Here’s a polished `README.md` tailored for your GitHub project, highlighting the purpose, installation, usage, and structure of your face recognition system:
-
----
-
 # Face Recognition System
 
 This repository provides a **face detection and recognition pipeline** that integrates detection, embedding generation, and clustering of faces. It supports single-image testing, batch processing from a database, continuous monitoring, and automated pipelines for recurring processing.
@@ -99,10 +95,11 @@ python main.py --recluster
 
 ```
 .
+├── .env                        # Environment variables (DB credentials, configs)
 ├── main.py                     # Entry point for CLI
+├── config.py                   # Database connection
 ├── image_face_detection/       # Face detection module
 │   ├── detect_faces.py         # Face Detection, Cropping and Save thumbnails logic
-│   └── config.py               # Database connection
 │   └── logger_config.py        # Logs Configuration
 │   └── logs/                   # Logs for detection
 ├── person_recognition          # Face Recognition Module
