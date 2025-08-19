@@ -9,16 +9,13 @@ from keras_facenet import FaceNet
 from sklearn.cluster import DBSCAN
 import umap
 
-# Logging setup
-os.makedirs("logs", exist_ok=True)
-logging.basicConfig(
-    filename="logs/embeddings_clustering.log",
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
-
+# logger setup
+from .logger_config import get_logger
+logger = get_logger()
+    
 # DB connection
-from image_face_detection.config import SQL_CONNECTION_STRING
+from config import SQL_CONNECTION_STRING
+
 conn_str = SQL_CONNECTION_STRING
 
 # FaceNet Embedder
@@ -71,9 +68,9 @@ def update_face_embedding(face_id, embedding):
         conn.commit()
         cursor.close()
         conn.close()
-        logging.info(f"Updated embedding for FaceId={face_id}")
+        logger.info(f"Updated embedding for FaceId={face_id}")
     except Exception as e:
-        logging.error(f"Failed to update embedding for FaceId {face_id}: {e}")
+        logger.error(f"Failed to update embedding for FaceId {face_id}: {e}")
 
 # Fetch faces to cluster
 def get_unassigned_faces(recluster=False, labelled=False):
@@ -113,7 +110,7 @@ def parse_embedding(raw_value):
             return np.array(json.loads(raw_value), dtype=np.float32)
         return None
     except Exception as e:
-        logging.error(f"Embedding parse error: {e}")
+        logger.error(f"Embedding parse error: {e}")
         return None
 
 # Update Database with clusters
@@ -122,26 +119,20 @@ def assign_clusters(labels, face_ids, recluster=False):
         conn = pyodbc.connect(conn_str)
         cursor = conn.cursor()
 
-        if recluster:
-            logging.info("Recluster mode: Resetting PersonId mappings...")
-            cursor.execute("UPDATE dbo.Faces SET PersonId = NULL")
-            cursor.execute("DELETE FROM dbo.Persons")
-            conn.commit()
-
         for cluster_id in set(labels):
             if cluster_id == -1:
                 continue
 
-            cursor.execute("""
+            '''cursor.execute("""
                 SELECT TOP 1 MediaItemId FROM dbo.Faces WHERE Id IN ({})
             """.format(",".join(str(fid) for fid, lab in zip(face_ids, labels) if lab == cluster_id)))
-            media_item_id = cursor.fetchone()[0]
+            media_item_id = cursor.fetchone()[0]'''
 
             cursor.execute("""
-                INSERT INTO dbo.Persons (MediaItemId, Rank, Appointment, CreatedAt)
+                INSERT INTO dbo.Persons (Name, Rank, Appointment, CreatedAt)
                 OUTPUT INSERTED.Id
                 VALUES (?, ?, ?, ?)
-            """, media_item_id, f"Cluster-{cluster_id}", "AutoCluster", datetime.now())
+            """, f"Person-{cluster_id}", f"Rank-{cluster_id}", f"Appointment-{cluster_id}", datetime.now())
             person_id = cursor.fetchone()[0]
 
             for face_id, label in zip(face_ids, labels):
@@ -157,20 +148,21 @@ def assign_clusters(labels, face_ids, recluster=False):
                 SET ModifiedAt = ?
                 WHERE Id = ?
             """, datetime.now(), person_id)
-
-            logging.info(f"Cluster {cluster_id} -> PersonId {person_id}")
+            logger.info(f"Cluster {cluster_id} -> PersonId {person_id}")
 
         conn.commit()
         cursor.close()
         conn.close()
 
     except Exception as e:
-        logging.error(f"DB update failed (assign clusters): {e}")
+        logger.error(f"DB update failed (assign clusters): {e}")
 
 
 # Processing Pipeline
 def process_missing_embeddings():
     """Find faces with NULL embedding, generate, and update."""
+    logger.info("Starting embedding process...")
+
     rows = get_faces_with_bboxes()
     if not rows:
         print("[INFO] No missing embeddings found.")
@@ -180,19 +172,19 @@ def process_missing_embeddings():
         face_id, full_path, bbox = row["FaceId"], row["FullPath"], row["BoundingBox"]
 
         if not os.path.exists(full_path):
-            logging.warning(f"File not found: {full_path}")
+            logger.warning(f"File not found: {full_path}")
             continue
 
         img = cv2.imread(full_path)
         if img is None or bbox is None:
-            logging.warning(f"Invalid image/bbox for FaceId={face_id}")
+            logger.warning(f"Invalid image/bbox for FaceId={face_id}")
             continue
 
         try:
             x1, y1, x2, y2 = [int(v) for v in bbox]
             face_crop = img[y1:y2, x1:x2]
             if face_crop.size == 0:
-                logging.warning(f"Empty crop for FaceId={face_id}")
+                logger.warning(f"Empty crop for FaceId={face_id}")
                 continue
 
             face_crop = cv2.cvtColor(face_crop, cv2.COLOR_BGR2RGB)
@@ -202,7 +194,7 @@ def process_missing_embeddings():
             update_face_embedding(face_id, emb)
 
         except Exception as e:
-            logging.error(f"Embedding failed for FaceId={face_id}: {e}")
+            logger.error(f"Embedding failed for FaceId={face_id}: {e}")
 
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -288,7 +280,7 @@ def main(recluster=False):
         labels = clustering.fit_predict(embeddings)
 
         num_clusters = len(set(labels)) - (1 if -1 in labels else 0)
-        logging.info(f"Found {num_clusters} clusters")
+        logger.info(f"Found {num_clusters} clusters")
 
         assign_clusters(labels, face_ids, recluster=False)
         print(f"[INFO] Finished. Found {num_clusters} clusters.")
