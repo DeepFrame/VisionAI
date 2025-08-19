@@ -6,7 +6,8 @@ import numpy as np
 from datetime import datetime
 from retinaface import RetinaFace
 from tabulate import tabulate
-from .config import SQL_CONNECTION_STRING, THUMBNAIL_SAVE_PATH
+#from .config import SQL_CONNECTION_STRING, THUMBNAIL_SAVE_PATH
+from config import SQL_CONNECTION_STRING, THUMBNAIL_SAVE_PATH
 
 import sys
 import time
@@ -15,13 +16,9 @@ import json
 
 import logging
 
-# Logging setup
-os.makedirs("logs", exist_ok=True)
-logging.basicConfig(
-    filename="logs/face_detection.log",
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
+# logger setup
+from .logger_config import get_logger
+logger = get_logger()
 
 # Load environment variables
 conn_str = SQL_CONNECTION_STRING
@@ -50,7 +47,7 @@ def get_unprocessed_files():
         return rows
     
     except Exception as e:
-        logging.error(f"Database update failed: {e}")
+        logger.error(f"Database update failed: {e}")
         return []
 
 def get_next_thumbnail_id(cursor):
@@ -84,7 +81,7 @@ def get_unassigned_faces():
         conn.close()
         return rows
     except Exception as e:
-        logging.error(f"Could not load unassigned faces: {e}")
+        logger.error(f"Could not load unassigned faces: {e}")
         #print(f"[ERROR] Could not load unassigned faces: {e}")
         return []
     
@@ -98,7 +95,7 @@ def parse_embedding(raw_value):
         else:
             raise ValueError("Unknown embedding format")
     except Exception as e:
-        logging.error(f"Failed to parse embedding: {e}")
+        logger.error(f"Failed to parse embedding: {e}")
         return None
 
 # DATABASE Update Query Processing
@@ -126,7 +123,7 @@ def update_database(media_item_id, face_bboxes, filename=None):
         for bbox in face_bboxes:
             # Ensure bbox is in the correct format [x1, y1, x2, y2]
             if not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
-                logging.warning(f"Invalid bounding box format: {bbox}")
+                logger.warning(f"Invalid bounding box format: {bbox}")
                 continue
 
             try:
@@ -153,17 +150,17 @@ def update_database(media_item_id, face_bboxes, filename=None):
                     """, media_item_id, bbox_str, filename, datetime.now())
                     inserted_count += 1
             except Exception as e:
-                logging.warning(f"Failed to process bounding box {bbox}: {e}")
+                logger.warning(f"Failed to process bounding box {bbox}: {e}")
                 continue
 
         conn.commit()
         cursor.close()
         conn.close()
 
-        logging.info(f"Inserted {inserted_count} new face(s), updated {updated_count} existing face(s) for MediaItemId {media_item_id}")
+        logger.info(f"Inserted {inserted_count} new face(s), updated {updated_count} existing face(s) for MediaItemId {media_item_id}")
 
     except Exception as e:
-        logging.error(f"Database update failed: {e}")
+        logger.error(f"Database update failed: {e}")
         if 'conn' in locals():
             conn.rollback()
 
@@ -233,12 +230,12 @@ def detect_and_crop_faces(image_path, media_item_id=None):
     try:
         img = cv2.imread(image_path)
         if img is None:
-            logging.error(f"Could not read image: {image_path}")
+            logger.error(f"Could not read image: {image_path}")
             return False
 
         faces = RetinaFace.detect_faces(image_path)
         if not isinstance(faces, dict) or len(faces) == 0:
-            logging.info(f"No faces detected in {image_path}")
+            logger.info(f"No faces detected in {image_path}")
             return False
 
         base_name = os.path.basename(image_path)
@@ -250,7 +247,7 @@ def detect_and_crop_faces(image_path, media_item_id=None):
         for idx, (key, face_data) in enumerate(faces.items()):
             processed_face, bbox = process_face_square(img, face_data, margin_ratio=0.2, target_size=(112, 112))
             if processed_face is None or bbox is None:
-                logging.warning(f"Face not found.")
+                logger.warning(f"Face not found.")
                 continue
 
             filename = f"{name_without_ext}_TN{idx + 1}{ext}"
@@ -258,10 +255,11 @@ def detect_and_crop_faces(image_path, media_item_id=None):
             
             try:
                 cv2.imwrite(save_path, processed_face)
-                logging.info(f"Saved square face {idx+1} to {save_path}")
-                bounding_boxes.append(bbox)
+                logger.info(f"Saved square face {idx+1} to {save_path}")
+                # Immediately update DB per face
+                update_database(media_item_id, [bbox], filename)
             except Exception as e:
-                logging.error(f"Failed to save face {idx+1}: {e}")
+                logger.error(f"Failed to save face {idx+1}: {e}")
 
         if media_item_id is not None and bounding_boxes:
             update_database(media_item_id, bounding_boxes, filename)
@@ -269,31 +267,31 @@ def detect_and_crop_faces(image_path, media_item_id=None):
         return True
 
     except Exception as e:
-        logging.error(f"Face processing failed for {image_path}: {e}")
+        logger.error(f"Face processing failed for {image_path}: {e}")
         return False
     
 # MAIN BATCH PROCESSOR
 def batch_process_from_db():
-    logging.info("Starting batch face detection from DB...")
+    logger.info("Starting batch face detection from DB...")
 
     rows = get_unprocessed_files()
     if not rows:
-        logging.info("No unprocessed files found.")
+        logger.info("No unprocessed files found.")
         return
 
     print(tabulate(rows, headers=["MediaItemId", "FilePath", "FileName"], tablefmt="grid"))
-    logging.info(tabulate(rows, headers=["MediaItemId", "FilePath", "FileName"], tablefmt="grid"))
-    logging.info(f"Found {len(rows)} unprocessed files.")
+    logger.info(tabulate(rows, headers=["MediaItemId", "FilePath", "FileName"], tablefmt="grid"))
+    logger.info(f"Found {len(rows)} unprocessed files.")
 
     for row in rows:
         media_item_id, file_path, file_name = row
         full_path = file_path
 
-        logging.info(f"\nProcessing MediaItemId {media_item_id}: {full_path}")
+        logger.info(f"\nProcessing MediaItemId {media_item_id}: {full_path}")
         detect_and_crop_faces(full_path, media_item_id=media_item_id)
 
     print("[INFO] Batch processing complete.")
-    logging.info("Batch processing complete.")
+    logger.info("Batch processing complete.")
 
 # TEST SINGLE IMAGE
 def test_single_image(image_path):
@@ -325,17 +323,17 @@ def continuous_batch_process():
 
         #print(tabulate(rows, headers=["MediaItemId", "FilePath", "FileName"], tablefmt="grid"))
 
-        logging.info(tabulate(rows, headers=["MediaItemId", "FilePath", "FileName"], tablefmt="grid"))
-        logging.info(f"Found {len(rows)} unprocessed files.")
+        logger.info(tabulate(rows, headers=["MediaItemId", "FilePath", "FileName"], tablefmt="grid"))
+        logger.info(f"Found {len(rows)} unprocessed files.")
 
         for row in rows:
             media_item_id, file_path, file_name = row
             full_path = file_path
 
-            logging.info(f"\nProcessing MediaItemId {media_item_id}: {full_path}")
+            logger.info(f"\nProcessing MediaItemId {media_item_id}: {full_path}")
             success = detect_and_crop_faces(full_path, media_item_id=media_item_id)
             if not success:
-                logging.warning(f"Skipped MediaItemId {media_item_id} due to processing error.")
+                logger.warning(f"Skipped MediaItemId {media_item_id} due to processing error.")
 
         print("[INFO] Completed current batch. Checking again in 10 seconds...\n")
         time.sleep(10)
@@ -362,7 +360,7 @@ def test_detect_and_crop_faces(image_path, media_item_id=None):
             filename = f"thumb_{media_item_id or 'manual'}_{idx+1}_{int(time.time())}.jpg"
             save_path = os.path.join(thumbnail_base_path, filename)
             cv2.imwrite(save_path, processed_face)
-            logging.info(f"[INFO] Saved face {idx+1} to {filename}")
+            logger.info(f"[INFO] Saved face {idx+1} to {filename}")
 
             if media_item_id is not None and boundings is not None:
                 update_database(media_item_id, boundings, filename)
