@@ -98,6 +98,12 @@ def parse_embedding(raw_value):
         logger.error(f"Failed to parse embedding: {e}")
         return None
 
+# Filter Non-Blurry Images
+def is_blurry(image, threshold=100.0):
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    variance = cv2.Laplacian(gray, cv2.CV_64F).var()
+    return variance < threshold, variance
+
 # DATABASE Update Query Processing
 def update_database(media_item_id, face_bboxes, filename=None):
     """
@@ -255,7 +261,7 @@ def detect_and_crop_faces(image_path, media_item_id=None):
             
             try:
                 cv2.imwrite(save_path, processed_face)
-                logger.info(f"Saved square face {idx+1} to {save_path}")
+                logger.info(f"Saved square (112x112) face {idx+1} to {save_path}")
                 # Immediately update DB per face
                 update_database(media_item_id, [bbox], filename)
             except Exception as e:
