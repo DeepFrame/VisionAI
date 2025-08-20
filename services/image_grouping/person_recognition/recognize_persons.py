@@ -114,26 +114,45 @@ def parse_embedding(raw_value):
         return None
 
 # Update Database with clusters
-def assign_clusters(labels, face_ids, recluster=False):
+def assign_clusters(labels, face_ids, recluster=False, existing_person_id=None):
+    """
+    Assign clusters to faces.
+    - If existing_person_id is provided, assign faces directly to that person.
+    - Otherwise, create new person entries per cluster.
+    """
     try:
         conn = pyodbc.connect(conn_str)
         cursor = conn.cursor()
 
-        for cluster_id in set(labels):
-            if cluster_id == -1:
-                continue
+        # === Direct assignment to existing person ===
+        if existing_person_id is not None:
+            logger.info(f"Assigning {len(face_ids)} faces to existing PersonId={existing_person_id}")
+            for face_id in face_ids:
+                cursor.execute("""
+                    UPDATE dbo.Faces
+                    SET PersonId = ?, ModifiedAt = ?
+                    WHERE Id = ?
+                """, int(existing_person_id), datetime.now(), int(face_id))
 
-            '''cursor.execute("""
-                SELECT TOP 1 MediaItemId FROM dbo.Faces WHERE Id IN ({})
-            """.format(",".join(str(fid) for fid, lab in zip(face_ids, labels) if lab == cluster_id)))
-            media_item_id = cursor.fetchone()[0]'''
+            conn.commit()
+            cursor.close()
+            conn.close()
+            return
+
+        # === Normal clustering mode ===
+        logger.info(f"Assigning {len(set(labels))} clusters to {len(face_ids)} faces...")
+        for cluster_id in set(labels):
+            if cluster_id == -1: 
+                continue
 
             cursor.execute("""
                 INSERT INTO dbo.Persons (Name, Rank, Appointment, CreatedAt)
                 OUTPUT INSERTED.Id
                 VALUES (?, ?, ?, ?)
-            """, f"Person-{cluster_id}", f"Rank-{cluster_id}", f"Appointment-{cluster_id}", datetime.now())
-            person_id = cursor.fetchone()[0]
+            """, f"Person-{int(cluster_id)}", f"Rank-{int(cluster_id)}", f"Appointment-{int(cluster_id)}", datetime.now())
+            person_id = int(cursor.fetchone()[0])
+
+            logger.info(f"Created new PersonId={person_id} for cluster {cluster_id}")
 
             for face_id, label in zip(face_ids, labels):
                 if label == cluster_id:
@@ -141,14 +160,13 @@ def assign_clusters(labels, face_ids, recluster=False):
                         UPDATE dbo.Faces
                         SET PersonId = ?, ModifiedAt = ?
                         WHERE Id = ?
-                    """, person_id, datetime.now(), face_id)
+                    """, person_id, datetime.now(), int(face_id))
 
             cursor.execute("""
                 UPDATE dbo.Persons
                 SET ModifiedAt = ?
                 WHERE Id = ?
             """, datetime.now(), person_id)
-            logger.info(f"Cluster {cluster_id} -> PersonId {person_id}")
 
         conn.commit()
         cursor.close()
@@ -156,7 +174,6 @@ def assign_clusters(labels, face_ids, recluster=False):
 
     except Exception as e:
         logger.error(f"DB update failed (assign clusters): {e}")
-
 
 # Processing Pipeline
 def process_missing_embeddings():
@@ -211,6 +228,11 @@ def recluster_unlabelled_faces(eps=0.35, min_samples=3, similarity_threshold=0.8
 
     labelled_embeddings = np.array(labelled_embeddings)
 
+    logger.info(f"Found {len(labelled_ids)} labelled faces for reclustering.")
+    if labelled_embeddings.size == 0:
+        print("[INFO] No labelled embeddings found for reclustering.")
+        return
+    
     unlabelled_rows = get_unassigned_faces(recluster=False)
     unlabelled_ids, unlabelled_embeddings = [], []
     for row in unlabelled_rows:
@@ -220,29 +242,45 @@ def recluster_unlabelled_faces(eps=0.35, min_samples=3, similarity_threshold=0.8
             unlabelled_ids.append(face_id)
             unlabelled_embeddings.append(emb)
 
+    logger.info(f"Found {len(unlabelled_ids)} unlabelled faces for reclustering.")
     if not unlabelled_embeddings:
         print("[INFO] No unlabelled embeddings to recluster.")
         return
 
     unlabelled_embeddings = np.array(unlabelled_embeddings)
-
+    logger.info(f"Unlabelled embeddings shape: {unlabelled_embeddings.shape}")
     for idx, emb in enumerate(unlabelled_embeddings):
         if labelled_embeddings.size == 0:
             break
         sims = cosine_similarity([emb], labelled_embeddings)[0]
+        
         max_idx = np.argmax(sims)
+        
+        logger.info(f"FaceId={unlabelled_ids[idx]} similarity with PersonId={labelled_persons[max_idx]}: {sims[max_idx]:.4f}")
         if sims[max_idx] >= similarity_threshold:
-            assign_clusters([labelled_persons[max_idx]], [unlabelled_ids[idx]], recluster=False)
+            logger.info(f"Assigning FaceId={unlabelled_ids[idx]} to PersonId={labelled_persons[max_idx]}")
+            assign_clusters(labels=None, face_ids=[unlabelled_ids[idx]], existing_person_id=labelled_persons[max_idx])
+
+            labelled_ids.append(unlabelled_ids[idx])
         else:
+            logger.info(f"FaceId={unlabelled_ids[idx]} does not meet similarity threshold, skipping.")
             continue
 
     remaining_ids = [fid for fid in unlabelled_ids if fid not in labelled_ids]
     remaining_embeddings = np.array([emb for i, emb in enumerate(unlabelled_embeddings) if unlabelled_ids[i] in remaining_ids])
-
+    
+    logger.info(f"Remaining unlabelled faces to cluster: {len(remaining_ids)}")
+    
     if remaining_embeddings.size > 0:
+        logger.info("Running DBSCAN on remaining unlabelled faces...")
         clustering = DBSCAN(eps=eps, min_samples=min_samples, metric="cosine")
         labels = clustering.fit_predict(remaining_embeddings)
+        logger.info(f'Labels found: {set(labels)}')
+        if len(set(labels)) <= 1:
+            logger.info("No significant clusters found in remaining unlabelled faces.")
+            return
         assign_clusters(labels, remaining_ids, recluster=False)
+        logger.info(f"Reclustering complete. Assigned {len(set(labels))} clusters to remaining unlabelled faces.")
 
 # Recognition pipeline: embeddings + clustering.
 def main(recluster=False):
@@ -283,4 +321,5 @@ def main(recluster=False):
         logger.info(f"Found {num_clusters} clusters")
 
         assign_clusters(labels, face_ids, recluster=False)
+
         print(f"[INFO] Finished. Found {num_clusters} clusters.")
