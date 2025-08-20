@@ -57,7 +57,7 @@ python main.py [options]
 | `--recognize`         | Generate embeddings and cluster detected faces.                      |
 | `--all`               | Run full pipeline: detection → recognition once.                     |
 | `--automate`          | Run full pipeline every 3 minutes.                                   |
-| `--recluster`         | Rebuild clusters for all faces, ignoring existing PersonId mappings. |
+| `--recluster`         | Rebuild clusters for unmatched faces by comparing with existing persons and with each other. |
 
 ### Examples
 
