@@ -133,6 +133,11 @@ def assign_clusters(labels, face_ids, recluster=False, existing_person_id=None):
                     SET PersonId = ?, ModifiedAt = ?
                     WHERE Id = ?
                 """, int(existing_person_id), datetime.now(), int(face_id))
+                cursor.execute("""
+                    UPDATE dbo.Persons
+                    SET ModifiedAt = ?
+                    WHERE Id = ?
+                """, datetime.now(), int(existing_person_id))
 
             conn.commit()
             cursor.close()
