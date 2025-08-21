@@ -96,8 +96,9 @@ python main.py --recluster
 ```
 .
 ├── .env                        # Environment variables (DB credentials, configs)
-├── main.py                     # Entry point for CLI
 ├── config.py                   # Database connection
+├── main.py                     # Entry point for CLI
+├── requirements.txt            # Install required dependencies
 ├── image_face_detection/       # Face detection module
 │   ├── detect_faces.py         # Face Detection, Cropping and Save thumbnails logic
 │   └── logger_config.py        # Logs Configuration
@@ -106,7 +107,6 @@ python main.py --recluster
 │   ├── recognize_persons.py    # Face embedding and clustering logic
 │   └── logger_config.py        # Logs Configuration
 │   └── logs/                   # Logs for embeddings and clustering 
-├── requirements.txt
 └── README.md
 ```
 
