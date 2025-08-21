@@ -26,7 +26,7 @@ cd deepframe-backend/services/image_grouping
 pip install -r requirements.txt
 ```
 
-3. Configure your database connection in `image_face_detection/config.py`:
+3. Configure your database connection in `config.py`:
 
 ```python
 SQL_CONNECTION_STRING = "DRIVER={SQL Server};SERVER=your_server;DATABASE=your_db;UID=user;PWD=password"
