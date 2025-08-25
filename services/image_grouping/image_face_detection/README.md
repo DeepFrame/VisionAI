@@ -129,7 +129,7 @@ cursor.execute("""
 
 **Stored fields:**
 
-- **Id** → auto generated ID (`TS###`)
+- **Id** → auto generated ID
 - **MediaItemId** → reference to the original media item file
 - **Name** → thumbnail file name
 - **BoundingBox** → Bounding Box coordinated of face detected
