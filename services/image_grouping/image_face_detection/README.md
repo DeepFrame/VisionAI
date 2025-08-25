@@ -118,31 +118,24 @@ cursor.execute(update_query, datetime.now(), media_item_id)
 - `FacesExtractedOn` is set to the current timestamp.
 - Prevents the same image from being processed again.
 
-### 2️⃣ Inserting into `dbo.ThumbnailStorage`
+### 2️⃣ Inserting into `dbo.Faces`
 
 For each cropped face, the script inserts a metadata record:
 
 ```python
-insert_query = """
-INSERT INTO dbo.ThumbnailStorage 
-(Id, MediaFileId, FileName, ThumbnailPath, CreatedOn)
-VALUES (?, ?, ?, ?, ?)
-"""
-cursor.execute(insert_query,
-               thumbnail_id,        # e.g., TS001
-               media_file_id,       # From dbo.MediaFile
-               thumbnail_filename,  # e.g., group_photo1_TN1.jpg
-               thumbnail_path,      # Full local path
-               datetime.now())
+cursor.execute("""
+               INSERT INTO dbo.Faces (MediaItemId, BoundingBox, Name, CreatedAt)
+               VALUES (?, ?, ?, ?)
+            """, media_item_id, bbox_str, filename, datetime.now())
 ```
 
 **Stored fields:**
 
-- **Id** → custom thumbnail ID (`TS###`)
-- **MediaFileId** → reference to the original media file
-- **FileName** → thumbnail name
-- **ThumbnailPath** → location on disk
-- **CreatedOn** → timestamp
+- **Id** → auto generated ID (`TS###`)
+- **MediaItemId** → reference to the original media item file
+- **Name** → thumbnail file name
+- **BoundingBox** → Bounding Box coordinated of face detected
+- **CreatedAt** → timestamp
 
 ---
 
