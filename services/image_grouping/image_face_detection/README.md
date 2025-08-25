@@ -11,14 +11,14 @@ Build a Python script that:
 1. Connect to database and query media items where `IsFacesExtracted = FALSE`
 2. For each media file:
    - Detect faces using RetinaFace
-   - Align, crop, and resize faces to 112x112 thumbnails
-   - Save thumbnails to configured `thumbnails/` directory
+   - Crop, and resize faces to 112x112 thumbnails
+   - Save thumbnails to configured `Thumbnails/` directory
    - Update database marking the media item as processed and save thumbnail info
 3. Repeat periodically for continuous processing
 4. Update database:
    - Set `IsFacesExtracted = TRUE`
    - Set `FacesExtractedOn = CURRENT_TIMESTAMP`
-   - Store thumbnail metadata in `ThumbnailStorage` table
+   - Store thumbnail metadata in `Faces` table
 
 ---
 
@@ -31,13 +31,11 @@ Build a Python script that:
 ## 📂 Project Structure
 ```python
 services/image_grouping/image_face_detection/
-├── config.py # Configuration settings
-├── detect_faces.py # Main processing logic
-├── main.py # CLI entry point
-├── .env # Environment variables
-├── Thumbnails/ # Output directory for face crops
-├── requirements.txt # Python dependencies
-└── README.md # This documentation
+├── detect_faces.py          # Main processing logic
+├── logger_config.py         # logs generation
+├── Images/                  # Input directory for images for face detection
+├── Thumbnails/              # Output directory for face crops
+└── README.md                # The documentation
 ```
 
 ## 🚀 Setup Instructions
@@ -55,7 +53,7 @@ services/image_grouping/image_face_detection/
 ### Installation
 1. Create and activate conda environment:
    ```bash
-   conda create -n face_detection python=3.10
+   conda create -n face_detection python=3.8.20
    conda activate face_detection
    ```
 2. Install dependencies:
