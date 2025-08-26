@@ -106,7 +106,10 @@ python main.py --recluster
 ├── person_recognition          # Face Recognition Module
 │   ├── recognize_persons.py    # Face embedding and clustering logic
 │   └── logger_config.py        # Logs Configuration
-│   └── logs/                   # Logs for embeddings and clustering 
+│   └── logs/                   # Logs for embeddings and clustering
+│   └── sql/
+│   │   ├── upsert_person.sql
+│   │   └── link_tables.sql
 └── README.md
 ```
 
