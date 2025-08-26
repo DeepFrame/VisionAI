@@ -106,11 +106,6 @@ def is_blurry(image, threshold=100.0):
 
 # DATABASE Update Query Processing
 def update_database(media_item_id, face_bboxes, filename=None):
-    """
-    Inserts detected faces into dbo.Faces (BoundingBox only, no embedding yet).
-    Avoids duplicates for same MediaItemId + BoundingBox.
-    Updates ModifiedAt if duplicate exists.
-    """
     try:
         conn = pyodbc.connect(conn_str)
         cursor = conn.cursor()
@@ -127,37 +122,29 @@ def update_database(media_item_id, face_bboxes, filename=None):
         updated_count = 0
 
         for bbox in face_bboxes:
-            # Ensure bbox is in the correct format [x1, y1, x2, y2]
             if not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
                 logger.warning(f"Invalid bounding box format: {bbox}")
                 continue
 
-            try:
-                bbox_norm = [round(float(c), 3) for c in bbox] 
-                bbox_str = json.dumps(bbox_norm) 
+            bbox_norm = [round(float(c), 3) for c in bbox] 
+            bbox_str = json.dumps(bbox_norm) 
 
-                cursor.execute("""
-                    SELECT Id FROM dbo.Faces
-                    WHERE MediaItemId = ? AND BoundingBox = ?
-                """, media_item_id, bbox_str)
-                row = cursor.fetchone()
+            # Call UpsertFace for insertion/updating
+            cursor.execute("""
+                EXEC dbo.UpsertFace
+                    @FaceId = NULL,
+                    @MediaItemId = ?,
+                    @PersonId = NULL,
+                    @BoundingBox = ?,
+                    @Name = ?,
+                    @Embedding = NULL
+            """, (media_item_id, bbox_str, filename))
 
-                if row:
-                    cursor.execute("""
-                        UPDATE dbo.Faces
-                        SET BoundingBox = ?, Name = ?, ModifiedAt = ?
-                        WHERE Id = ?
-                    """, bbox_str, filename, datetime.now(), row[0])
-                    updated_count += 1
-                else:
-                    cursor.execute("""
-                        INSERT INTO dbo.Faces (MediaItemId, BoundingBox, Name, CreatedAt)
-                        VALUES (?, ?, ?, ?)
-                    """, media_item_id, bbox_str, filename, datetime.now())
-                    inserted_count += 1
-            except Exception as e:
-                logger.warning(f"Failed to process bounding box {bbox}: {e}")
-                continue
+            row = cursor.fetchone()
+            if row:
+                updated_count += 1
+            else:
+                inserted_count += 1
 
         conn.commit()
         cursor.close()
