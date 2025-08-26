@@ -23,18 +23,21 @@ With its modular pipeline and configurable architecture, the Face Recognition Sy
 │ │ ├── requirements.txt                           # Install required dependencies
 │ │ ├── image_face_detection/                      # Face detection module
 │ │ │   ├── detect_faces.py                        # Face detection, cropping & thumbnails
-│ │ │   ├── logger_config.py                       # Logs configuration
+│ │ │   └── logger_config.py                       # Logs configuration
 │ │ │   └── logs/                                  # Detection logs
 │ │ ├── person_recognition/                        # Face recognition module
 │ │ │   ├── recognize_persons.py                   # Embedding + clustering logic
-│ │ │   ├── logger_config.py                       # Logs configuration
-│ │ │   └── logs/                                  # Recognition logs 
+│ │ │   └── logger_config.py                       # Logs configuration
+│ │ │   └── logs/                                  # Recognition logs
+│ │ │   └── sql/
+│ │ │   │   ├── upsert_person.sql
+│ │ │   │   └── link_tables.sql
 │ │ ├── Notebooks/                 
 │ │ │ └── Face_Recognition_System_(FRS).ipynb      # Face detection and recognition jupyter notebook
 │ │ └── README.md
 ├── docs/
-│ └── Face_Recognition_System_Manual.pdf
-│ ├── immich_face_recognition.md
+│ ├── Face_Recognition_System_Manual.pdf
+│ └── immich_face_recognition.md
 ```
 
 ## Setup and Installation
