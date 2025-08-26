@@ -60,11 +60,9 @@ def update_face_embedding(face_id, embedding):
         conn = pyodbc.connect(conn_str)
         cursor = conn.cursor()
         emb_bytes = embedding.astype(np.float32).tobytes()
-        cursor.execute("""
-            UPDATE dbo.Faces
-            SET Embedding = ?, ModifiedAt = ?
-            WHERE Id = ?
-        """, emb_bytes, datetime.now(), face_id)
+        
+        cursor.execute("EXEC dbo.UpsertFace @FaceId=?, @Embedding=?", (face_id, emb_bytes)) 
+        
         conn.commit()
         cursor.close()
         conn.close()
@@ -101,7 +99,6 @@ def get_unassigned_faces(recluster=False, labelled=False):
     conn.close()
     return rows
 
-
 def parse_embedding(raw_value):
     try:
         if isinstance(raw_value, bytes):
@@ -128,16 +125,8 @@ def assign_clusters(labels, face_ids, recluster=False, existing_person_id=None):
         if existing_person_id is not None:
             logger.info(f"Assigning {len(face_ids)} faces to existing PersonId={existing_person_id}")
             for face_id in face_ids:
-                cursor.execute("""
-                    UPDATE dbo.Faces
-                    SET PersonId = ?, ModifiedAt = ?
-                    WHERE Id = ?
-                """, int(existing_person_id), datetime.now(), int(face_id))
-                cursor.execute("""
-                    UPDATE dbo.Persons
-                    SET ModifiedAt = ?
-                    WHERE Id = ?
-                """, datetime.now(), int(existing_person_id))
+                cursor.execute("EXEC dbo.UpsertFace @FaceId=?, @PersonId=?", (face_id, existing_person_id))
+                cursor.execute("EXEC dbo.UpsertPerson ?, ?, ?, ?", (int(existing_person_id), None, None, None))
 
             conn.commit()
             cursor.close()
@@ -150,22 +139,16 @@ def assign_clusters(labels, face_ids, recluster=False, existing_person_id=None):
             if cluster_id == -1: 
                 continue
 
-            cursor.execute("""
-                INSERT INTO dbo.Persons (Name, Rank, Appointment, CreatedAt)
-                OUTPUT INSERTED.Id
-                VALUES (?, ?, ?, ?)
-            """, f"Person-{int(cluster_id)}", f"Rank-{int(cluster_id)}", f"Appointment-{int(cluster_id)}", datetime.now())
+            cursor.execute("EXEC dbo.UpsertPerson ?, ?, ?, ?", 
+                        (None, f"Person-{int(cluster_id)}", f"Rank-{int(cluster_id)}", f"Appointment-{int(cluster_id)}"))
+
             person_id = int(cursor.fetchone()[0])
 
             logger.info(f"Created new PersonId={person_id} for cluster {cluster_id}")
 
             for face_id, label in zip(face_ids, labels):
                 if label == cluster_id:
-                    cursor.execute("""
-                        UPDATE dbo.Faces
-                        SET PersonId = ?, ModifiedAt = ?
-                        WHERE Id = ?
-                    """, person_id, datetime.now(), int(face_id))
+                    cursor.execute("EXEC dbo.UpsertFace @FaceId=?, @PersonId=?", (face_id, existing_person_id))
 
             cursor.execute("""
                 UPDATE dbo.Persons
