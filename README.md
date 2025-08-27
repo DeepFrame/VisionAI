@@ -38,6 +38,8 @@ With its modular pipeline and configurable architecture, the Face Recognition Sy
 ├── docs/
 │ ├── Face_Recognition_System_Manual.pdf
 │ └── immich_face_recognition.md
+├── backend/                                       # Backend files
+│ ├── ....
 ```
 
 ## Setup and Installation
