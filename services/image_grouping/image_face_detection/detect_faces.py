@@ -106,6 +106,11 @@ def is_blurry(image, threshold=100.0):
 
 # DATABASE Update Query Processing
 def update_database(media_item_id, face_bboxes, filename=None):
+    """
+    Inserts detected faces into dbo.Faces (BoundingBox only, no embedding yet).
+    Avoids duplicates for same MediaItemId + BoundingBox.
+    Updates ModifiedAt if duplicate exists.
+    """
     try:
         conn = pyodbc.connect(conn_str)
         cursor = conn.cursor()
@@ -122,29 +127,37 @@ def update_database(media_item_id, face_bboxes, filename=None):
         updated_count = 0
 
         for bbox in face_bboxes:
+            # Ensure bbox is in the correct format [x1, y1, x2, y2]
             if not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
                 logger.warning(f"Invalid bounding box format: {bbox}")
                 continue
 
-            bbox_norm = [round(float(c), 3) for c in bbox] 
-            bbox_str = json.dumps(bbox_norm) 
+            try:
+                bbox_norm = [round(float(c), 3) for c in bbox] 
+                bbox_str = json.dumps(bbox_norm) 
 
-            # Call UpsertFace for insertion/updating
-            cursor.execute("""
-                EXEC dbo.UpsertFace
-                    @FaceId = NULL,
-                    @MediaItemId = ?,
-                    @PersonId = NULL,
-                    @BoundingBox = ?,
-                    @Name = ?,
-                    @Embedding = NULL
-            """, (media_item_id, bbox_str, filename))
+                cursor.execute("""
+                    SELECT Id FROM dbo.Faces
+                    WHERE MediaItemId = ? AND BoundingBox = ?
+                """, media_item_id, bbox_str)
+                row = cursor.fetchone()
 
-            row = cursor.fetchone()
-            if row:
-                updated_count += 1
-            else:
-                inserted_count += 1
+                if row:
+                    cursor.execute("""
+                        UPDATE dbo.Faces
+                        SET BoundingBox = ?, Name = ?, ModifiedAt = ?
+                        WHERE Id = ?
+                    """, bbox_str, filename, datetime.now(), row[0])
+                    updated_count += 1
+                else:
+                    cursor.execute("""
+                        INSERT INTO dbo.Faces (MediaItemId, BoundingBox, Name, CreatedAt)
+                        VALUES (?, ?, ?, ?)
+                    """, media_item_id, bbox_str, filename, datetime.now())
+                    inserted_count += 1
+            except Exception as e:
+                logger.warning(f"Failed to process bounding box {bbox}: {e}")
+                continue
 
         conn.commit()
         cursor.close()
@@ -219,7 +232,7 @@ def process_face_square(img, face, margin_ratio=0.2, target_size=(112, 112)):
     return resized_face, updated_bbox
 
 # FACE DETECTION (RetinaFace)
-def detect_and_crop_faces(image_path, media_item_id=None):
+def detect_and_crop_faces(image_path, media_item_id=None, dry_run=False):
     try:
         img = cv2.imread(image_path)
         if img is None:
@@ -247,14 +260,17 @@ def detect_and_crop_faces(image_path, media_item_id=None):
             save_path = os.path.join(thumbnail_base_path, filename)
             
             try:
-                cv2.imwrite(save_path, processed_face)
-                logger.info(f"Saved square (112x112) face {idx+1} to {save_path}")
-                # Immediately update DB per face
-                update_database(media_item_id, [bbox], filename)
+                if not dry_run:
+                    cv2.imwrite(save_path, processed_face)
+                    logger.info(f"Saved square (112x112) face {idx+1} to {save_path}")
+                    # Immediately update DB per face
+                    update_database(media_item_id, [bbox], filename)
+                else:
+                    logger.info(f"[Dry Run] Would save face {idx+1} to {save_path}")
             except Exception as e:
                 logger.error(f"Failed to save face {idx+1}: {e}")
 
-        if media_item_id is not None and bounding_boxes:
+        if media_item_id is not None and bounding_boxes and not dry_run:
             update_database(media_item_id, bounding_boxes, filename)
 
         return True
@@ -264,7 +280,7 @@ def detect_and_crop_faces(image_path, media_item_id=None):
         return False
     
 # MAIN BATCH PROCESSOR
-def batch_process_from_db():
+def batch_process_from_db(dry_run=False):
     logger.info("Starting batch face detection from DB...")
 
     rows = get_unprocessed_files()
@@ -278,21 +294,21 @@ def batch_process_from_db():
 
     for row in rows:
         media_item_id, file_path, file_name = row
-        full_path = file_path
+        full_path = os.path.join(file_path, file_name)
 
         logger.info(f"\nProcessing MediaItemId {media_item_id}: {full_path}")
-        detect_and_crop_faces(full_path, media_item_id=media_item_id)
+        detect_and_crop_faces(full_path, media_item_id=media_item_id, dry_run=dry_run)
 
     print("[INFO] Batch processing complete.")
     logger.info("Batch processing complete.")
 
 # TEST SINGLE IMAGE
-def test_single_image(image_path):
+def test_single_image(image_path, dry_run=False):
     print(f"[INFO] Testing face detection on single image: {image_path}")
-    test_detect_and_crop_faces(image_path)
+    test_detect_and_crop_faces(image_path, dry_run=dry_run)
 
 # CONTINUOUS BATCH PROCESSING
-def continuous_batch_process():
+def continuous_batch_process(dry_run=False):
     print("[INFO] Starting continuous face detection monitoring...")
     no_data_attempts = 0
 
@@ -321,10 +337,10 @@ def continuous_batch_process():
 
         for row in rows:
             media_item_id, file_path, file_name = row
-            full_path = file_path
+            full_path = os.path.join(file_path, file_name)
 
             logger.info(f"\nProcessing MediaItemId {media_item_id}: {full_path}")
-            success = detect_and_crop_faces(full_path, media_item_id=media_item_id)
+            success = detect_and_crop_faces(full_path, media_item_id=media_item_id, dry_run=dry_run)
             if not success:
                 logger.warning(f"Skipped MediaItemId {media_item_id} due to processing error.")
 
@@ -332,7 +348,7 @@ def continuous_batch_process():
         time.sleep(10)
 
 # Test Detection and Cropping (Single file)
-def test_detect_and_crop_faces(image_path, media_item_id=None):
+def test_detect_and_crop_faces(image_path, media_item_id=None, dry_run=False):
     try:
         img = cv2.imread(image_path)
         if img is None:
@@ -355,7 +371,7 @@ def test_detect_and_crop_faces(image_path, media_item_id=None):
             cv2.imwrite(save_path, processed_face)
             logger.info(f"[INFO] Saved face {idx+1} to {filename}")
 
-            if media_item_id is not None and boundings is not None:
+            if media_item_id is not None and boundings is not None and not dry_run:
                 update_database(media_item_id, boundings, filename)
 
         print(f"[INFO] Successfully processed {len(faces)} faces in {image_path}")
