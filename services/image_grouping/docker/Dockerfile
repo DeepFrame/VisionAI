@@ -1,5 +1,15 @@
 FROM python:3.8.20
 
+# Add these lines to your existing Dockerfile
+RUN apt-get update && \
+    apt-get install -y curl gnupg && \
+    curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - && \
+    curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list > /etc/apt/sources.list.d/mssql-release.list && \
+    apt-get update && \
+    ACCEPT_EULA=Y apt-get install -y msodbcsql17 unixodbc-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+    
 # Install ODBC libraries and OpenCV dependencies
 RUN apt-get update && apt-get install -y \
     unixodbc \
@@ -29,6 +39,7 @@ COPY main.py ./main.py
 COPY docker/docker-entrypoint.sh /usr/local/bin/
 COPY docker/healthcheck.py ./docker/healthcheck.py
 COPY config.py ./config.py
+COPY .env ./.env
 
 # Copy logger_config.py files to their respective folders
 COPY person_recognition/logger_config.py ./person_recognition/logger_config.py
