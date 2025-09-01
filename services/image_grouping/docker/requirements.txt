@@ -1,0 +1,15 @@
+numpy
+pyodbc
+opencv_python
+retina-face
+tabulate
+python-dotenv
+pandas
+openpyxl
+insightface
+onnxruntime
+keras-facenet
+umap-learn
+scikit-learn
+matplotlib
+tensorflow
