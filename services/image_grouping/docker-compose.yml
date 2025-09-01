@@ -1,0 +1,23 @@
+services:
+  image_grouping:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    
+    container_name: image-grouping-service
+    
+    volumes:
+      - ./person_recognition/logs:/app/services/image_grouping/person_recognition/logs
+      - ./image_face_detection/logs:/app/services/image_grouping/image_face_detection/logs
+
+    env_file:
+      - docker/.env.example
+
+    healthcheck:
+      test: ["CMD-SHELL", "python ./docker/healthcheck.py"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+    restart: unless-stopped
+    entrypoint: ["docker-entrypoint.sh"]
