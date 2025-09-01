@@ -9,9 +9,11 @@ services:
     volumes:
       - ./person_recognition/logs:/app/services/image_grouping/person_recognition/logs
       - ./image_face_detection/logs:/app/services/image_grouping/image_face_detection/logs
+      - ./Thumbnails:/app/services/image_grouping/Thumbnails 
 
     env_file:
       - docker/.env.example
+      - ./.env 
 
     healthcheck:
       test: ["CMD-SHELL", "python ./docker/healthcheck.py"]
