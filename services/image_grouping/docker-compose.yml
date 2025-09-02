@@ -1,25 +1,57 @@
 services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: image-grouping-sqlserver
+    environment:
+      SA_PASSWORD: "${SA_PASSWORD:-password}"
+      ACCEPT_EULA: "Y"
+    volumes:
+      - kyc-saga-sqldb:/var/opt/mssql
+    restart: unless-stopped
+    networks:
+      - app-network
+    ports:
+      - "1433:1433"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -U sa -P $${MSSQL_SA_PASSWORD} -Q 'SELECT 1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   image_grouping:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    
     container_name: image-grouping-service
-    
+    depends_on:
+      - sqlserver
     volumes:
       - ./person_recognition/logs:/app/services/image_grouping/person_recognition/logs
       - ./image_face_detection/logs:/app/services/image_grouping/image_face_detection/logs
-      - ./Thumbnails:/app/services/image_grouping/Thumbnails 
-
+      - ./Thumbnails:/app/services/image_grouping/Thumbnails
     env_file:
       - docker/.env.example
-      - ./.env 
-
+      - ./.env
+    environment:
+      # Pass environment variables to toggle auth mode
+      USE_SQL_AUTH: "${USE_SQL_AUTH:-true}"
+      SQL_SERVER: "${SQL_SERVER:-server}"
+      SQL_DATABASE: "${SQL_DATABASE:-frs}"
+      SQL_USER: "${SQL_USER:-user}"
+      SQL_PASSWORD: "${SQL_PASSWORD:-password}"
+    networks:
+      - app-network
     healthcheck:
       test: ["CMD-SHELL", "python ./docker/healthcheck.py"]
       interval: 10s
       timeout: 5s
       retries: 3
-
     restart: unless-stopped
     entrypoint: ["docker-entrypoint.sh"]
+
+volumes:
+  kyc-saga-sqldb:
+
+networks:
+  app-network:
+    driver: bridge
