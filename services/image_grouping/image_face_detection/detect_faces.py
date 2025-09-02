@@ -34,7 +34,7 @@ def get_unprocessed_files():
         cursor = conn.cursor()
 
         query = """
-        SELECT MI.Id, MF.FilePath, MI.FileName
+        SELECT MI.Id, MF.FilePath, MI.Name
         FROM dbo.MediaItems MI
         JOIN dbo.MediaFile MF ON MI.MediaFileId = MF.Id
         WHERE MI.IsFacesExtracted = 0
@@ -294,7 +294,7 @@ def batch_process_from_db(dry_run=False):
 
     for row in rows:
         media_item_id, file_path, file_name = row
-        full_path = os.path.join(file_path, file_name)
+        full_path = file_path
 
         logger.info(f"\nProcessing MediaItemId {media_item_id}: {full_path}")
         detect_and_crop_faces(full_path, media_item_id=media_item_id, dry_run=dry_run)
@@ -337,7 +337,7 @@ def continuous_batch_process(dry_run=False):
 
         for row in rows:
             media_item_id, file_path, file_name = row
-            full_path = os.path.join(file_path, file_name)
+            full_path = file_path
 
             logger.info(f"\nProcessing MediaItemId {media_item_id}: {full_path}")
             success = detect_and_crop_faces(full_path, media_item_id=media_item_id, dry_run=dry_run)
