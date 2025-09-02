@@ -51,7 +51,7 @@ def get_faces_with_bboxes():
             bbox = json.loads(bbox_json) if bbox_json else None
         except:
             bbox = None
-        full_path = file_path+"/"+file_name
+        full_path = file_path
         logger.info(f"[DB] FaceId={face_id}, File={full_path}, BBox={bbox}")
         results.append({
             "FaceId": face_id,
