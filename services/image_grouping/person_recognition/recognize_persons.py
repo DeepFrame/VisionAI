@@ -104,18 +104,19 @@ def calculate_sharpness(image_path):
 
 def generate_portraits(rows, portrait_dir, dry_run=False):
     """
-    Generate portraits for each person:
+    Generate portraits for each person using existing MediaFiles:
     - Select medoid + sharpest face
-    - Save as new file
-    - Insert into MediaFile table
-    - Update Persons.PortraitMediaFileId
+    - Update Persons.PortraitMediaFileId and PortraitFaceId
+    - Update MediaFile.ModifiedAt
+    - No new file creation or MediaFile insertion
     """
-    if not os.path.exists(portrait_dir) and not dry_run:
+
+    if not os.path.exists(portrait_dir) and not dry_run: 
         os.makedirs(portrait_dir)
 
     faces_by_person = defaultdict(list)
     for row in rows:
-        person_id = row.PersonId 
+        person_id = row.PersonId
         faces_by_person[person_id].append({
             "FaceId": row.FaceId,
             "FaceImagePath": row.FaceImagePath,
@@ -128,7 +129,6 @@ def generate_portraits(rows, portrait_dir, dry_run=False):
         cluster_embeddings = np.array([f["Embedding"] for f in face_entries])
         cluster_faces = [f["FaceImagePath"] for f in face_entries]
 
-        # Find medoid (closest to all others in embedding space)
         sim_matrix = cosine_similarity(cluster_embeddings)
         dist_matrix = 1 - sim_matrix
         total_distances = dist_matrix.sum(axis=1)
@@ -136,7 +136,6 @@ def generate_portraits(rows, portrait_dir, dry_run=False):
 
         medoid_path = cluster_faces[medoid_idx]
 
-        # Pick the sharpest image in the cluster
         medoid_sharpness = calculate_sharpness(medoid_path)
         for i, path in enumerate(cluster_faces):
             candidate_sharpness = calculate_sharpness(path)
@@ -144,53 +143,67 @@ def generate_portraits(rows, portrait_dir, dry_run=False):
                 medoid_path = path
                 medoid_sharpness = candidate_sharpness
 
-        logger.info(f"Selected portrait for Person {person_id}: {medoid_path} (Sharpness={medoid_sharpness})")
+        medoid_face_id = None
+        for f in face_entries:
+            if f["FaceImagePath"] == medoid_path:
+                medoid_face_id = f["FaceId"]
+                break
 
-        if not dry_run and medoid_path:
-            # Save portrait to portrait_dir
-            output_file_name = f"Person_{person_id}_portrait.jpg"
-            output_path = os.path.join(portrait_dir, output_file_name)
-            shutil.copy(medoid_path, output_path)
-            logger.info(f"Saved portrait to {output_path}")
+        if medoid_face_id is None:
+            logger.error(f"Could not find FaceId for medoid image {medoid_path} of Person {person_id}")
+            continue
 
-            # Insert into MediaFile table
-            mediafile_id = insert_media_file(output_file_name, portrait_dir)
+        logger.info(f"Selected portrait for Person {person_id}: {medoid_path} (Sharpness={medoid_sharpness}, FaceId={medoid_face_id})")
 
-            # Update Persons.PortraitMediaFileId
-            update_portrait_mediafile_id(person_id, mediafile_id)
+        if not dry_run and medoid_path: 
+            output_path = os.path.join(portrait_dir, f"Person_{person_id}_portrait.jpg") 
+            shutil.copy(medoid_path, output_path) 
+            logger.info(f"Saved portrait for Person {person_id}: {output_path}\n\n")
+            update_portrait_with_existing_mediafile(person_id, medoid_face_id)
 
-def insert_media_file(file_name, folder_path):
-    """Insert a new MediaFile record and return its ID."""
-    full_path = os.path.abspath(folder_path)
+def update_portrait_with_existing_mediafile(person_id, face_id):
+    """
+    Fetch the MediaFileId for a given FaceId and update:
+    - Persons.PortraitMediaFileId
+    - Persons.PortraitFaceId
+    - MediaFile.ModifiedAt
+    """
     try:
         with pyodbc.connect(conn_str) as conn:
             with conn.cursor() as cursor:
+                # Get MediaFileId from the face
                 cursor.execute("""
-                    INSERT INTO dbo.MediaFile (FilePath, FileName, CreatedAt)
-                    OUTPUT INSERTED.Id
-                    VALUES (?, ?, ?)
-                """, full_path, file_name, datetime.now())
-                mediafile_id = cursor.fetchone()[0]
-                conn.commit()
-        return mediafile_id
-    except Exception as e:
-        logger.error(f"[ERROR] Failed to insert MediaFile: {e}")
-        return None
+                    SELECT mf.Id AS MediaFileId
+                    FROM dbo.Faces f
+                    JOIN dbo.MediaItems mi ON f.MediaItemId = mi.Id
+                    JOIN dbo.MediaFile mf ON mi.MediaFileId = mf.Id
+                    WHERE f.Id = ?
+                """, face_id)
+                row = cursor.fetchone()
+                if not row:
+                    logger.error(f"No MediaFile found for FaceId={face_id}")
+                    return
+                mediafile_id = row[0]
 
-def update_portrait_mediafile_id(person_id, mediafile_id):
-    """Update Persons.PortraitMediaFileId."""
-    try:
-        with pyodbc.connect(conn_str) as conn:
-            with conn.cursor() as cursor:
+                # Update Persons with MediaFileId + FaceId
                 cursor.execute("""
                     UPDATE dbo.Persons
-                    SET PortraitMediaFileId = ?, ModifiedAt = ?
+                    SET PortraitMediaFileId = ?, 
+                        ModifiedAt = ?
                     WHERE Id = ?
                 """, mediafile_id, datetime.now(), person_id)
+
+                # Update MediaFile.ModifiedAt
+                cursor.execute("""
+                    UPDATE dbo.MediaFile
+                    SET ModifiedAt = ?
+                    WHERE Id = ?
+                """, datetime.now(), mediafile_id)
+
                 conn.commit()
-        logger.info(f"[DB] Updated PersonId={person_id} with PortraitMediaFileId={mediafile_id}")
+                logger.info(f"[DB] Linked PersonId={person_id} to FaceId={face_id}, MediaFileId={mediafile_id}")
     except Exception as e:
-        logger.error(f"[ERROR] Failed to update PortraitMediaFileId for PersonId={person_id}: {e}")
+        logger.error(f"[ERROR] Failed updating Portrait for PersonId={person_id}, FaceId={face_id}: {e}")
 
 def update_portrait_face_id(person_id, face_id):
     """Update Persons.PortraitFaceId with the chosen FaceId"""
