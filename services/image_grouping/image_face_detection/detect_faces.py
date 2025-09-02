@@ -380,3 +380,4 @@ def test_detect_and_crop_faces(image_path, media_item_id=None, dry_run=False):
     except Exception as e:
         print(f"[ERROR] Face processing failed for {image_path}: {e}")
         return False
+
