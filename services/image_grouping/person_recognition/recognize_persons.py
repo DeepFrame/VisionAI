@@ -103,11 +103,17 @@ def calculate_sharpness(image_path):
     return laplacian_var
 
 def generate_portraits(rows, portrait_dir, dry_run=False):
+    """
+    Generate portraits for each person:
+    - Select medoid + sharpest face
+    - Save as new file
+    - Insert into MediaFile table
+    - Update Persons.PortraitMediaFileId
+    """
     if not os.path.exists(portrait_dir) and not dry_run:
         os.makedirs(portrait_dir)
 
     faces_by_person = defaultdict(list)
-
     for row in rows:
         person_id = row.PersonId 
         faces_by_person[person_id].append({
@@ -116,47 +122,75 @@ def generate_portraits(rows, portrait_dir, dry_run=False):
             "Embedding": parse_embedding(row.Embedding)
         })
 
-    #logger.info(f"\n\nFaces grouped by person: {dict(faces_by_person)}")
-    logger.info(f"\n\nTotal persons to process: {len(faces_by_person)}")
-    logger.info(f"faces_by_person keys: {list(faces_by_person.keys())}")
-
-    face_files = [row.FaceImagePath for row in rows]
-    face_embeddings = np.array([parse_embedding(row.Embedding) for row in rows])
-    labels = [row.PersonId for row in rows]
-
-    logger.info(f"face_files: {face_files} \nface_embeddings shape: {face_embeddings.shape} \nlabels: {labels}")
+    logger.info(f"Total persons to process: {len(faces_by_person)}")
 
     for person_id, face_entries in faces_by_person.items():
         cluster_embeddings = np.array([f["Embedding"] for f in face_entries])
         cluster_faces = [f["FaceImagePath"] for f in face_entries]
-        cluster_face_ids = [f["FaceId"] for f in face_entries]
 
-        logger.info(f"Processing PersonId={person_id} with {len(cluster_faces)} faces.")
-
+        # Find medoid (closest to all others in embedding space)
         sim_matrix = cosine_similarity(cluster_embeddings)
         dist_matrix = 1 - sim_matrix
         total_distances = dist_matrix.sum(axis=1)
         medoid_idx = np.argmin(total_distances)
 
         medoid_path = cluster_faces[medoid_idx]
-        medoid_face_id = cluster_face_ids[medoid_idx]
 
+        # Pick the sharpest image in the cluster
         medoid_sharpness = calculate_sharpness(medoid_path)
         for i, path in enumerate(cluster_faces):
             candidate_sharpness = calculate_sharpness(path)
             if candidate_sharpness > medoid_sharpness:
                 medoid_path = path
-                medoid_face_id = cluster_face_ids[i]
                 medoid_sharpness = candidate_sharpness
 
-        logger.info(f"\nSelected medoid for Person {person_id}: {medoid_path} (FaceId={medoid_face_id}, Sharpness={medoid_sharpness})")
+        logger.info(f"Selected portrait for Person {person_id}: {medoid_path} (Sharpness={medoid_sharpness})")
 
         if not dry_run and medoid_path:
-            output_path = os.path.join(portrait_dir, f"Person_{person_id}_portrait.jpg")
+            # Save portrait to portrait_dir
+            output_file_name = f"Person_{person_id}_portrait.jpg"
+            output_path = os.path.join(portrait_dir, output_file_name)
             shutil.copy(medoid_path, output_path)
-            logger.info(f"Saved portrait for Person {person_id}: {output_path}\n\n")
+            logger.info(f"Saved portrait to {output_path}")
 
-            update_portrait_face_id(person_id, medoid_face_id)
+            # Insert into MediaFile table
+            mediafile_id = insert_media_file(output_file_name, portrait_dir)
+
+            # Update Persons.PortraitMediaFileId
+            update_portrait_mediafile_id(person_id, mediafile_id)
+
+def insert_media_file(file_name, folder_path):
+    """Insert a new MediaFile record and return its ID."""
+    full_path = os.path.abspath(folder_path)
+    try:
+        with pyodbc.connect(conn_str) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO dbo.MediaFile (FilePath, FileName, CreatedAt)
+                    OUTPUT INSERTED.Id
+                    VALUES (?, ?, ?)
+                """, full_path, file_name, datetime.now())
+                mediafile_id = cursor.fetchone()[0]
+                conn.commit()
+        return mediafile_id
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to insert MediaFile: {e}")
+        return None
+
+def update_portrait_mediafile_id(person_id, mediafile_id):
+    """Update Persons.PortraitMediaFileId."""
+    try:
+        with pyodbc.connect(conn_str) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE dbo.Persons
+                    SET PortraitMediaFileId = ?, ModifiedAt = ?
+                    WHERE Id = ?
+                """, mediafile_id, datetime.now(), person_id)
+                conn.commit()
+        logger.info(f"[DB] Updated PersonId={person_id} with PortraitMediaFileId={mediafile_id}")
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to update PortraitMediaFileId for PersonId={person_id}: {e}")
 
 def update_portrait_face_id(person_id, face_id):
     """Update Persons.PortraitFaceId with the chosen FaceId"""
@@ -174,8 +208,6 @@ def update_portrait_face_id(person_id, face_id):
         print(f"[DB] Updated PersonId={person_id} with PortraitFaceId={face_id}")
     except Exception as e:
         print(f"[ERROR] Failed to update PortraitFaceId for PersonId={person_id}: {e}")
-
-
 
 # Fetch faces to cluster
 def get_unassigned_faces(recluster=False, labelled=False):
@@ -215,7 +247,7 @@ def get_faces_with_paths(conn_str=conn_str):
             p.Id AS PersonId,
             f.Id AS FaceId,
             f.Name AS FaceName,
-            'C:\\Users\\ADMIN\\Downloads\\FRS_Project\\services\\image_grouping\\image_face_detection\\Thumbnails\\'
+            'C:\\Users\\ADMIN\\Downloads\\DeepFrame-UP\\services\\image_grouping\\image_face_detection\\Thumbnails\\'
                 + f.Name AS FaceImagePath,
             f.Embedding
         FROM dbo.Faces f
