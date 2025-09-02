@@ -1,0 +1,53 @@
+version: '3.9'
+
+services:
+  mssql_db:
+    container_name: mssql_container
+    image: ${MSSQL_IMAGE:-mcr.microsoft.com/mssql/server:latest}
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: ${MSSQL_PRODUCT_ID:-Developer}
+      SA_PASSWORD: "${MSSQL_SA_PASSWORD:-StrongP@ssword}"
+    volumes:
+      - mssqlsystem:/var/opt/mssql
+      - mssqluser:/var/opt/sqlserver
+      - ${MSSQL_CONFIG_DIR:-./config/mssql}/entrypoint.sh:/usr/src/app/entrypoint.sh
+      - ${MSSQL_CONFIG_DIR:-./config/mssql}/sql/:/usr/src/app/docker-entrypoint-initdb.d
+    working_dir: /usr/src/app
+    command: sh -c 'chmod +x ./entrypoint.sh; ./entrypoint.sh & /opt/mssql/bin/sqlservr;'
+    ports:
+      - "${MSSQL_PORT:-1433}:1433"
+    networks:
+      - env_net
+    restart: unless-stopped
+
+  image_grouping:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: image-grouping-service
+    volumes:
+      - ./person_recognition/logs:/app/services/image_grouping/person_recognition/logs
+      - ./image_face_detection/logs:/app/services/image_grouping/image_face_detection/logs
+      - ./Thumbnails:/app/services/image_grouping/Thumbnails
+    env_file:
+      - docker/.env.example
+      - ./.env
+    healthcheck:
+      test: ["CMD-SHELL", "python ./docker/healthcheck.py"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - env_net
+    restart: unless-stopped
+    entrypoint: ["docker-entrypoint.sh"]
+
+networks:
+  env_net:
+    external: true
+    driver: bridge
+
+volumes:
+  mssqlsystem:
+  mssqluser:
