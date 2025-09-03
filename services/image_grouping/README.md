@@ -118,6 +118,9 @@ python main.py --recluster
 │   └── sql/                    # SQL scripts for DB interactions
 │       ├── upsert_person.sql   # Insert/update persons in database
 │       └── link_tables.sql     # Manage relationships between DB tables
+│   └── Notebooks/              # Jupyter notebooks for experiments and demos
+│       ├── Face_Recognition_System_(FRS).ipynb  
+│       └── README.md           
 └── README.md                   # Project overview, setup, and usage instructions
 ```
 
