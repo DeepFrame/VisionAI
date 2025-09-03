@@ -95,22 +95,30 @@ python main.py --recluster
 
 ```
 .
-├── .env                        # Environment variables (DB credentials, configs)
-├── config.py                   # Database connection
-├── main.py                     # Entry point for CLI
-├── requirements.txt            # Install required dependencies
-├── image_face_detection/       # Face detection module
-│   ├── detect_faces.py         # Face Detection, Cropping and Save thumbnails logic
-│   └── logger_config.py        # Logs Configuration
-│   └── logs/                   # Logs for detection
-├── person_recognition          # Face Recognition Module
-│   ├── recognize_persons.py    # Face embedding and clustering logic
-│   └── logger_config.py        # Logs Configuration
-│   └── logs/                   # Logs for embeddings and clustering
-│   └── sql/
-│   │   ├── upsert_person.sql
-│   │   └── link_tables.sql
-└── README.md
+├── .env                        # Environment variables (DB credentials, app configs)
+├── config.py                   # Database connection and global config loader
+├── main.py                     # CLI entry point to run detection/recognition pipeline
+├── requirements.txt            # Python dependencies for local development
+├── docker-compose.yml          # Docker Compose config for running services
+├── docker/
+│   ├── .env.example            # Example env file for containerized setup
+│   ├── Dockerfile              # Image build instructions
+│   ├── docker-entrypoint.sh    # Entrypoint script to bootstrap container
+│   ├── healthcheck.py          # Healthcheck script for container monitoring
+│   ├── requirements.txt        # Python dependencies inside the container
+│   └── README.md               # Notes for Docker usage and setup
+├── image_face_detection/       # Face detection package
+│   ├── detect_faces.py         # Detects faces, crops, and saves thumbnails
+│   ├── logger_config.py        # Logger configuration for detection module
+│   └── logs/                   # Logs generated during face detection
+├── person_recognition/         # Face recognition package
+│   ├── recognize_persons.py    # Face embedding generation and clustering logic
+│   ├── logger_config.py        # Logger configuration for recognition module
+│   ├── logs/                   # Logs generated during recognition
+│   └── sql/                    # SQL scripts for DB interactions
+│       ├── upsert_person.sql   # Insert/update persons in database
+│       └── link_tables.sql     # Manage relationships between DB tables
+└── README.md                   # Project overview, setup, and usage instructions
 ```
 
 ## Logging
