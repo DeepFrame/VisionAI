@@ -15,12 +15,14 @@ from collections import defaultdict
 from sklearn.metrics.pairwise import cosine_similarity
 import shutil
 
+import re, posixpath
+
 # logger setup
 from .logger_config import get_logger
 logger = get_logger()
     
 # DB connection
-from config import SQL_CONNECTION_STRING
+from config import SQL_CONNECTION_STRING, OLD_PREFIX, NEW_PREFIX
 
 conn_str = SQL_CONNECTION_STRING
 
@@ -28,6 +30,23 @@ conn_str = SQL_CONNECTION_STRING
 embedder = FaceNet()
 
 # DB Utilities
+def to_container_path(db_path: str) -> str:
+    # normalize slashes and trim spaces
+    p = db_path.strip().replace("\\", "/")
+    old = OLD_PREFIX.rstrip("/")
+    new = NEW_PREFIX.rstrip("/")
+
+    if p.lower().startswith(old.lower()):
+        suffix = p[len(old):].lstrip("/")
+        logger.info(f"[DOCKER] CONTAINER Path -> {posixpath.join(new, suffix)}")
+        return posixpath.join(new, suffix)
+
+    m = re.search(r"/(\d{1,})/([^/]+)$", p)
+    if m:
+        return posixpath.join(new, m.group(1), m.group(2))
+
+    raise ValueError(f"Cannot map path: {db_path}")
+
 def get_faces_with_bboxes():
     """Fetch faces missing embeddings (NULL Embedding)."""
     conn = pyodbc.connect(conn_str)
@@ -51,7 +70,7 @@ def get_faces_with_bboxes():
             bbox = json.loads(bbox_json) if bbox_json else None
         except:
             bbox = None
-        full_path = file_path
+        full_path = to_container_path(file_path)
         logger.info(f"[DB] FaceId={face_id}, File={full_path}, BBox={bbox}")
         results.append({
             "FaceId": face_id,
@@ -160,6 +179,10 @@ def generate_portraits(rows, portrait_dir, dry_run=False):
             shutil.copy(medoid_path, output_path) 
             logger.info(f"Saved portrait for Person {person_id}: {output_path}\n\n")
             update_portrait_with_existing_mediafile(person_id, medoid_face_id)
+        else:
+            output_path = os.path.join(portrait_dir, f"Person_{person_id}_portrait.jpg") 
+            shutil.copy(medoid_path, output_path) 
+            logger.info(f"Saved portrait for Person {person_id}: {output_path}\n\n")
 
 def update_portrait_with_existing_mediafile(person_id, face_id):
     """
@@ -260,8 +283,7 @@ def get_faces_with_paths(conn_str=conn_str):
             p.Id AS PersonId,
             f.Id AS FaceId,
             f.Name AS FaceName,
-            'C:\\Users\\ADMIN\\Downloads\\DeepFrame-UP\\services\\image_grouping\\image_face_detection\\Thumbnails\\'
-                + f.Name AS FaceImagePath,
+            f.Name AS FaceFileName,
             f.Embedding
         FROM dbo.Faces f
         INNER JOIN dbo.Persons p 
@@ -270,11 +292,19 @@ def get_faces_with_paths(conn_str=conn_str):
     """)
 
     rows = cursor.fetchall()
-    columns = [column[0] for column in cursor.description]
-
     cursor.close()
     conn.close()
-    return rows, columns
+
+    results = []
+    for row in rows:
+        person_id, face_id, face_name, file_name, embedding = row
+        # Map thumbnail using configured OLD_PREFIX/NEW_PREFIX
+        db_thumb_path = os.path.join(NEW_PREFIX, "Thumbnails", file_name)
+        face_image_path = to_container_path(db_thumb_path)
+        results.append((person_id, face_id, face_name, face_image_path, embedding))
+
+    return results, ["PersonId", "FaceId", "FaceName", "FaceImagePath", "Embedding"]
+
 
 def parse_embedding(raw_value):
     try:
@@ -501,7 +531,7 @@ def main(recluster=False, dry_run=False):
 
         print(f"[INFO] Finished. Found {num_clusters} clusters.")
     
-    portrait_dir = "individuals_portraits"
+    portrait_dir = "/app/services/image_grouping/individuals_portraits"
 
     if not os.path.exists(portrait_dir):
         os.makedirs(portrait_dir)
