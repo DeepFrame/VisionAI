@@ -3,7 +3,7 @@ services:
     image: mcr.microsoft.com/mssql/server:2019-latest
     container_name: image-grouping-sqlserver
     environment:
-      SA_PASSWORD: "${SA_PASSWORD:-password}"
+      SA_PASSWORD: "${SA_PASSWORD:-pass1234}"
       ACCEPT_EULA: "Y"
     volumes:
       - kyc-saga-sqldb:/var/opt/mssql
@@ -24,21 +24,22 @@ services:
       dockerfile: docker/Dockerfile
     container_name: image-grouping-service
     depends_on:
-      - sqlserver
+      - sqlserver      
     volumes:
       - ./person_recognition/logs:/app/services/image_grouping/person_recognition/logs
       - ./image_face_detection/logs:/app/services/image_grouping/image_face_detection/logs
       - ./Thumbnails:/app/services/image_grouping/Thumbnails
+      - ./individuals_portraits:/app/services/image_grouping/individuals_portraits:rw
+      - image_grouping_uploaded:/app/services/image_grouping/image_face_detection/Images:ro
     env_file:
       - docker/.env.example
       - ./.env
     environment:
-      # Pass environment variables to toggle auth mode
       USE_SQL_AUTH: "${USE_SQL_AUTH:-true}"
-      SQL_SERVER: "${SQL_SERVER:-server}"
-      SQL_DATABASE: "${SQL_DATABASE:-frs}"
+      SQL_SERVER: "${SQL_SERVER:-123.123.1.123}"
+      SQL_DATABASE: "${SQL_DATABASE:-database}"
       SQL_USER: "${SQL_USER:-user}"
-      SQL_PASSWORD: "${SQL_PASSWORD:-password}"
+      SQL_PASSWORD: "${SQL_PASSWORD:-pass1234}"
     networks:
       - app-network
     healthcheck:
@@ -51,7 +52,13 @@ services:
 
 volumes:
   kyc-saga-sqldb:
+  image_grouping_uploaded:
+    driver: local
+    driver_opts:
+      type: cifs
+      o:  username=administrator,password=pass1234
+      device: "//123.123.1.123/files/location"
 
 networks:
   app-network:
-    driver: bridge
+    driver: bridge  
