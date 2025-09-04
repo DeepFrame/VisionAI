@@ -6,8 +6,12 @@ import numpy as np
 from datetime import datetime
 from retinaface import RetinaFace
 from tabulate import tabulate
+
 #from .config import SQL_CONNECTION_STRING, THUMBNAIL_SAVE_PATH
 from config import SQL_CONNECTION_STRING, THUMBNAIL_SAVE_PATH
+from config import OLD_PREFIX, NEW_PREFIX, SYSTEM_THUMBNAILS_PATH
+
+import posixpath, re
 
 import sys
 import time
@@ -23,9 +27,11 @@ logger = get_logger()
 # Load environment variables
 conn_str = SQL_CONNECTION_STRING
 thumbnail_base_path = THUMBNAIL_SAVE_PATH
+system_thumb_path = SYSTEM_THUMBNAILS_PATH
 
 # Ensure the thumbnail directory exists
 os.makedirs(thumbnail_base_path, exist_ok=True)
+os.makedirs(system_thumb_path, exist_ok=True)
 
 # DATABASE Unprocessed files and Thumbnails Query Processing
 def get_unprocessed_files():
@@ -49,23 +55,6 @@ def get_unprocessed_files():
     except Exception as e:
         logger.error(f"Database update failed: {e}")
         return []
-
-def get_next_thumbnail_id(cursor):
-    cursor.execute("""
-        SELECT TOP 1 Id 
-        FROM dbo.ThumbnailStorage 
-        WHERE Id LIKE 'TS%' 
-        ORDER BY Id DESC
-    """)
-    row = cursor.fetchone()
-    if row:
-        last_id = row[0]  
-        last_num = int(last_id[2:]) 
-        next_num = last_num + 1
-    else:
-        next_num = 1
-
-    return f"TS{next_num:03d}" 
 
 def get_unassigned_faces():
     try:
@@ -97,6 +86,23 @@ def parse_embedding(raw_value):
     except Exception as e:
         logger.error(f"Failed to parse embedding: {e}")
         return None
+
+def to_container_path(db_path: str) -> str:
+    # normalize slashes and trim spaces
+    p = db_path.strip().replace("\\", "/")
+    old = OLD_PREFIX.rstrip("/")
+    new = NEW_PREFIX.rstrip("/")
+
+    if p.lower().startswith(old.lower()):
+        suffix = p[len(old):].lstrip("/")
+        logger.info(f"[DOCKER] CONTAINER Path -> {posixpath.join(new, suffix)}")
+        return posixpath.join(new, suffix)
+
+    m = re.search(r"/(\d{1,})/([^/]+)$", p)
+    if m:
+        return posixpath.join(new, m.group(1), m.group(2))
+
+    raise ValueError(f"Cannot map path: {db_path}")
 
 # Filter Non-Blurry Images
 def is_blurry(image, threshold=100.0):
@@ -258,12 +264,17 @@ def detect_and_crop_faces(image_path, media_item_id=None, dry_run=False):
 
             filename = f"{name_without_ext}_TN{idx + 1}{ext}"
             save_path = os.path.join(thumbnail_base_path, filename)
+            sys_save_path = os.path.join(system_thumb_path, filename)
             
             try:
+                cv2.imwrite(save_path, processed_face)
+                cv2.imwrite(sys_save_path, processed_face)
+
+                logger.info(f"Saved in system, the face {idx+1} to \n{sys_save_path} and \n{save_path}")
+
                 if not dry_run:
-                    cv2.imwrite(save_path, processed_face)
                     logger.info(f"Saved square (112x112) face {idx+1} to {save_path}")
-                    # Immediately update DB per face
+
                     update_database(media_item_id, [bbox], filename)
                 else:
                     logger.info(f"[Dry Run] Would save face {idx+1} to {save_path}")
@@ -294,7 +305,7 @@ def batch_process_from_db(dry_run=False):
 
     for row in rows:
         media_item_id, file_path, file_name = row
-        full_path = file_path
+        full_path = to_container_path(file_path)
 
         logger.info(f"\nProcessing MediaItemId {media_item_id}: {full_path}")
         detect_and_crop_faces(full_path, media_item_id=media_item_id, dry_run=dry_run)
@@ -337,7 +348,7 @@ def continuous_batch_process(dry_run=False):
 
         for row in rows:
             media_item_id, file_path, file_name = row
-            full_path = file_path
+            full_path = to_container_path(file_path)
 
             logger.info(f"\nProcessing MediaItemId {media_item_id}: {full_path}")
             success = detect_and_crop_faces(full_path, media_item_id=media_item_id, dry_run=dry_run)
@@ -367,8 +378,14 @@ def test_detect_and_crop_faces(image_path, media_item_id=None, dry_run=False):
                 continue
 
             filename = f"thumb_{media_item_id or 'manual'}_{idx+1}_{int(time.time())}.jpg"
+            
             save_path = os.path.join(thumbnail_base_path, filename)
             cv2.imwrite(save_path, processed_face)
+
+            sys_save_path = os.path.join(system_thumb_path, filename)
+            cv2.imwrite(sys_save_path, processed_face)
+            logger.info(f"Saved in system, the face {idx+1} to \n{sys_save_path} and \n{save_path}")
+            
             logger.info(f"[INFO] Saved face {idx+1} to {filename}")
 
             if media_item_id is not None and boundings is not None and not dry_run:
@@ -380,4 +397,3 @@ def test_detect_and_crop_faces(image_path, media_item_id=None, dry_run=False):
     except Exception as e:
         print(f"[ERROR] Face processing failed for {image_path}: {e}")
         return False
-
