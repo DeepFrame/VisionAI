@@ -58,7 +58,7 @@ cd deepframe-backend/services/image_grouping
 pip install -r requirements.txt
 ```
 
-3. Configure your database connection in `config.py`:
+3. Configure your database connection in `.env`:
 
 ```python
 SQL_CONNECTION_STRING = "DRIVER={SQL Server};SERVER=your_server;DATABASE=your_db;UID=user;PWD=password"
@@ -66,10 +66,59 @@ SQL_CONNECTION_STRING = "DRIVER={SQL Server};SERVER=your_server;DATABASE=your_db
 
 4. Ensure your database contains the required tables with required fields:
 
-* `MediaFile`
-* `MediaItems`
-* `Faces`
-* `Persons`
+* dbo.MediaFile
+
+| Column Name | Data Type | Required | Notes |
+|-------------|-----------|----------|-------|
+| Id | INT (PK, Identity) | Yes | Primary key |
+| FilePath | NVARCHAR(500) | Yes | Path to media file |
+| FileName | NVARCHAR(255) | Yes | File name |
+| Extensions | NVARCHAR(10) | No | File extension |
+| CreatedAt | DATETIME2 | Yes | Default: `SYSDATETIME()` |
+| ModifiedAt | DATETIME2 | No | Last modified timestamp |
+
+---
+
+* dbo.MediaItems
+
+| Column Name | Data Type | Required | Notes |
+|-------------|-----------|----------|-------|
+| Id | INT (PK, Identity) | Yes | Primary key |
+| MediaFileId | INT (FK → MediaFile.Id) | Yes | Reference to media file |
+| Name | NVARCHAR(255) | Yes | Media item name |
+| IsFacesExtracted | BIT | Yes | Default: `0` |
+| FacesExtractedOn | DATETIME2 | No | Timestamp when faces extracted |
+
+---
+
+* dbo.Persons
+
+| Column Name | Data Type | Required | Notes |
+|-------------|-----------|----------|-------|
+| Id | INT (PK, Identity) | Yes | Primary key |
+| PortraitMediaFileId | INT (FK → MediaFile.Id) | No | Portrait file reference |
+| Name | NVARCHAR(255) | No | Person name |
+| Rank | NVARCHAR(50) | No | Rank |
+| Appointment | NVARCHAR(100) | No | Appointment |
+| CreatedAt | DATETIME2 | Yes | Default: `SYSDATETIME()` |
+| ModifiedAt | DATETIME2 | No | Last modified timestamp |
+
+---
+
+* dbo.Faces
+
+| Column Name | Data Type | Required | Notes |
+|-------------|-----------|----------|-------|
+| Id | INT (PK, Identity) | Yes | Primary key |
+| MediaItemId | INT (FK → MediaItems.Id) | Yes | Reference to media item |
+| PersonId | INT (FK → Persons.Id) | No | Linked person |
+| BoundingBox | NVARCHAR(255) | No | Face bounding box |
+| Embedding | VARBINARY(MAX) | No | Face embedding vector |
+| FrameNumber | INT | No | Frame number (if from video) |
+| Name | NVARCHAR(255) | No | Optional name/label |
+| CreatedAt | DATETIME2 | Yes | Default: `SYSDATETIME()` |
+| ModifiedAt | DATETIME2 | No | Last modified timestamp |
+
 
 ### Usage
 
