@@ -135,11 +135,11 @@ def generate_portraits(rows, portrait_dir, dry_run=False):
 
     faces_by_person = defaultdict(list)
     for row in rows:
-        person_id = row.PersonId
+        person_id = row["PersonId"]
         faces_by_person[person_id].append({
-            "FaceId": row.FaceId,
-            "FaceImagePath": row.FaceImagePath,
-            "Embedding": parse_embedding(row.Embedding)
+            "FaceId": row["FaceId"],
+            "FaceImagePath": row["FaceImagePath"],
+            "Embedding": parse_embedding(row["Embedding"]),
         })
 
     logger.info(f"Total persons to process: {len(faces_by_person)}")
@@ -179,10 +179,6 @@ def generate_portraits(rows, portrait_dir, dry_run=False):
             shutil.copy(medoid_path, output_path) 
             logger.info(f"Saved portrait for Person {person_id}: {output_path}\n\n")
             update_portrait_with_existing_mediafile(person_id, medoid_face_id)
-        else:
-            output_path = os.path.join(portrait_dir, f"Person_{person_id}_portrait.jpg") 
-            shutil.copy(medoid_path, output_path) 
-            logger.info(f"Saved portrait for Person {person_id}: {output_path}\n\n")
 
 def update_portrait_with_existing_mediafile(person_id, face_id):
     """
@@ -298,11 +294,15 @@ def get_faces_with_paths(conn_str=conn_str):
     results = []
     for row in rows:
         person_id, face_id, face_name, file_name, embedding = row
-        # Map thumbnail using configured OLD_PREFIX/NEW_PREFIX
         db_thumb_path = os.path.join(NEW_PREFIX, "Thumbnails", file_name)
         face_image_path = to_container_path(db_thumb_path)
-        results.append((person_id, face_id, face_name, face_image_path, embedding))
-
+        results.append({
+            "PersonId": person_id,
+            "FaceId": face_id,
+            "FaceName": face_name,
+            "FaceImagePath": face_image_path,
+            "Embedding": embedding,
+        })
     return results, ["PersonId", "FaceId", "FaceName", "FaceImagePath", "Embedding"]
 
 
@@ -531,15 +531,16 @@ def main(recluster=False, dry_run=False):
 
         print(f"[INFO] Finished. Found {num_clusters} clusters.")
     
-    portrait_dir = "/app/services/image_grouping/individuals_portraits"
+    portrait_dir = "individuals_portraits"
 
     if not os.path.exists(portrait_dir):
         os.makedirs(portrait_dir)
 
     rows, columns = get_faces_with_paths()
-    logger.info(f"Current DB entries: {len(rows)} faces, columns: {columns}")
-    logger.info(tabulate(rows, headers=columns, tablefmt="psql"))
+    logger.info(tabulate([list(r.values()) for r in rows], headers=columns, tablefmt="psql"))
 
+
+    print("[Step 3:] Generating portraits for each person...")
     generate_portraits(rows, portrait_dir, dry_run=dry_run)
     print("[INFO] Portraits saved to 'individuals_portraits/' directory.")
     logger.info("Portrait generation complete.")
