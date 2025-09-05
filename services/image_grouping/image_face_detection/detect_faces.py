@@ -33,6 +33,82 @@ system_thumb_path = SYSTEM_THUMBNAILS_PATH
 os.makedirs(thumbnail_base_path, exist_ok=True)
 os.makedirs(system_thumb_path, exist_ok=True)
 
+def check_thumbnails(dry_run=False):
+    """
+    Check if thumbnails exist for each entry in dbo.Faces.
+    If missing, recreate them using the stored bounding box.
+    """
+
+    try:
+        conn = pyodbc.connect(conn_str)
+        cursor = conn.cursor()
+
+        query = """
+        SELECT f.Id, f.BoundingBox, f.Name, mf.FilePath, mf.FileName
+        FROM dbo.Faces f
+        INNER JOIN dbo.MediaItems mi ON f.MediaItemId = mi.Id
+        INNER JOIN dbo.MediaFile mf ON mi.MediaFileId = mf.Id
+        """
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        if not rows:
+            logger.info("No faces found in DB.")
+            return
+
+        for face_id, bbox_str, face_name, file_path, file_name in rows:
+            try:
+                # convert DB path -> container path
+                full_path = to_container_path(file_path)
+
+                # thumbnail naming scheme: <OriginalName>_TN<index>.jpg
+                base_name, _ = os.path.splitext(file_name)
+                thumb_name = face_name if face_name else f"{base_name}_TN{face_id}.jpg"
+                thumb_path = os.path.join(thumbnail_base_path, thumb_name)
+
+                if os.path.exists(thumb_path):
+                    logger.debug(f"Thumbnail exists: {thumb_name}")
+                    continue  # skip
+
+                logger.info(f"[Missing] Recreating thumbnail: {thumb_name}")
+
+                # read original image
+                img = cv2.imread(full_path)
+                if img is None:
+                    logger.error(f"Could not read original image: {full_path}")
+                    continue
+
+                # parse bounding box
+                if not bbox_str:
+                    logger.warning(f"No bounding box for FaceId {face_id}")
+                    continue
+
+                bbox = json.loads(bbox_str) if isinstance(bbox_str, str) else None
+                if not bbox or len(bbox) != 4:
+                    logger.warning(f"Invalid bbox for FaceId {face_id}: {bbox_str}")
+                    continue
+
+                x1, y1, x2, y2 = map(int, bbox)
+                cropped = img[y1:y2, x1:x2]
+
+                if cropped.size == 0:
+                    logger.warning(f"Empty crop for FaceId {face_id}")
+                    continue
+
+                if not dry_run:
+                    cv2.imwrite(thumb_path, cropped)
+                    logger.info(f"[OK] Created {thumb_path}")
+                else:
+                    logger.info(f"[DryRun] Would create {thumb_path}")
+
+            except Exception as e:
+                logger.error(f"Error processing FaceId {face_id}: {e}")
+
+    except Exception as e:
+        logger.error(f"check_thumbnails() failed: {e}")
+        
 # DATABASE Unprocessed files and Thumbnails Query Processing
 def get_unprocessed_files():
     try:
