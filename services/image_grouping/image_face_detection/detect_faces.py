@@ -43,7 +43,7 @@ def get_unprocessed_files():
         SELECT MI.Id, MF.FilePath, MI.Name
         FROM dbo.MediaItems MI
         JOIN dbo.MediaFile MF ON MI.MediaFileId = MF.Id
-        WHERE MI.IsFacesExtracted = 0
+        WHERE MI.IsFacesExtracted = 0 AND LOWER(MF.Extensions) IN ('.jpg', '.jpeg', '.png', '.bmp', '.tiff')
         """
         cursor.execute(query)
         rows = cursor.fetchall()
