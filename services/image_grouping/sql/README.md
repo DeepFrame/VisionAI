@@ -2,13 +2,13 @@
 
 ## 📌 Objective
 
-Set up the SQL Server database with initial media file entries to be used later for face detection and grouping. Data was inserted manually using SQL Server Management Studio (SSMS) 21.
+Set up the SQL Server database with initial media file entries to be used later for face detection, recognition, and grouping. Data was inserted manually using **SQL Server Management Studio (SSMS 2022)**.
 
 ---
 
-## 🗄️ Database: `MetaData`
+## 🗄️ Database: `FaceRecognitionSystem`
 
-This task uses a SQL Server database named `MetaData`.
+This task uses a SQL Server database named `FaceRecognitionSystem`.
 
 ---
 
@@ -20,58 +20,83 @@ Stores metadata about media files.
 
 | Column      | Type           | Description                                      |
 |-------------|----------------|--------------------------------------------------|
-| Id          | NVARCHAR(10)   | Unique ID for each media file (e.g., `'MF001'`) |
-| FilePath    | NVARCHAR(255)  | Full file path to the image/video               |
-| FileName    | NVARCHAR(100)  | Name of the media file                          |
-| MediaType   | VARCHAR(10)    | Either `'image'` or `'video'`                   |
+| Id          | INT (PK)       | Unique identifier for each media file            |
+| FilePath    | NVARCHAR(500)  | Full file path to the image/video                |
+| FileName    | NVARCHAR(255)  | Name of the media file                           |
+| Extensions  | NVARCHAR(10)   | File extension (e.g., `.jpg`, `.mp4`)            |
+| CreatedAt   | DATETIME2      | Timestamp when record was created                |
+| ModifiedAt  | DATETIME2      | Timestamp when record was last modified          |
 
 ---
 
-### 2. `dbo.ThumbnailStorage`
+### 2. `dbo.MediaItems`
 
-Stores thumbnails generated for media files.
+Tracks processing status of media files.
 
-| Column        | Type           | Description                                      |
-|---------------|----------------|--------------------------------------------------|
-| Id            | NVARCHAR(10)   | Unique ID for each thumbnail (e.g., `'TS001'`)   |
-| MediaFileId   | NVARCHAR(10)   | FK to `MediaFile(Id)`                            |
-| FileName      | NVARCHAR(100)  | Thumbnail filename                               |
-| ThumbnailPath | NVARCHAR(255)  | Full path to the thumbnail file                  |
-| CreatedOn     | DATETIME       | Timestamp when the thumbnail was created         |
-
----
-
-### 3. `dbo.MediaItems`
-
-Tracks face processing status of each media file.
-
-| Column            | Type           | Description                                                               |
-|-------------------|----------------|---------------------------------------------------------------------------|
-| Id                | NVARCHAR(10)   | Unique ID for the media item (e.g., `'MI001'`)                            |
-| MediaFileId       | NVARCHAR(10)   | FK to `MediaFile(Id)`                                                     |
-| FileName          | NVARCHAR(100)  | Redundant name for ease of access                                         |
-| IsFacesExtracted  | BIT            | `0` = not processed, `1` = processed                                      |
-| FacesExtractedOn  | DATETIME       | Timestamp when face extraction was completed (NULL if not processed)      |
+| Column           | Type           | Description                                                               |
+|------------------|----------------|---------------------------------------------------------------------------|
+| Id               | INT (PK)       | Unique identifier for the media item                                      |
+| MediaFileId      | INT (FK)       | References `MediaFile(Id)`                                                |
+| Name             | NVARCHAR(255)  | Media item name                                                           |
+| IsFacesExtracted | BIT            | `0` = not processed, `1` = processed                                      |
+| FacesExtractedOn | DATETIME2      | Timestamp when face extraction was completed (NULL if not processed)      |
 
 ---
 
-## 🔗 Relationship
+### 3. `dbo.Persons`
+
+Stores details of recognized individuals.
+
+| Column             | Type           | Description                                      |
+|--------------------|----------------|--------------------------------------------------|
+| Id                 | INT (PK)       | Unique identifier for each person                |
+| PortraitMediaFileId| INT (FK)       | References `MediaFile(Id)` for portrait image    |
+| Name               | NVARCHAR(255)  | Person’s name                                    |
+| Rank               | NVARCHAR(50)   | Rank/position                                    |
+| Appointment        | NVARCHAR(100)  | Appointment/role                                 |
+| CreatedAt          | DATETIME2      | Timestamp when record was created                |
+| ModifiedAt         | DATETIME2      | Timestamp when record was last modified          |
+
+---
+
+### 4. `dbo.Faces`
+
+Stores information about detected faces.
+
+| Column       | Type            | Description                                      |
+|--------------|-----------------|--------------------------------------------------|
+| Id           | INT (PK)        | Unique identifier for each detected face          |
+| MediaItemId  | INT (FK)        | References `MediaItems(Id)`                      |
+| PersonId     | INT (FK)        | References `Persons(Id)`                         |
+| BoundingBox  | NVARCHAR(255)   | Coordinates of detected face bounding box         |
+| Embedding    | VARBINARY(MAX)  | Numerical representation (feature vector) of face |
+| FrameNumber  | INT             | Frame number (for video files)                   |
+| Name         | NVARCHAR(255)   | Optional label/name for detected face             |
+| CreatedAt    | DATETIME2       | Timestamp when record was created                 |
+| ModifiedAt   | DATETIME2       | Timestamp when record was last modified           |
+
+---
+
+## 🔗 Relationships
 
 - `MediaItems.MediaFileId` → `MediaFile.Id`
-- `ThumbnailStorage.MediaFileId` → `MediaFile.Id`
-- A foreign key constraint ensures referential integrity.
+- `Persons.PortraitMediaFileId` → `MediaFile.Id`
+- `Faces.MediaItemId` → `MediaItems.Id`
+- `Faces.PersonId` → `Persons.Id`
+
+A set of foreign key constraints ensures referential integrity.
 
 ---
 
 ## 📥 Sample Data Inserted
 
-Three image entries were manually inserted via SSMS:
+Three sample images were manually inserted via SSMS:
 
 | File Name         | Path                                                                 |
 |-------------------|----------------------------------------------------------------------|
-| `news.jpg`        | `C:/Users/ADMIN/Downloads/FRS_ml/sample_images/news.jpg`            |
-| `conference.jpg`  | `C:/Users/ADMIN/Downloads/FRS_ml/sample_images/conference.jpg`      |
-| `interview.jpg`   | `C:/Users/ADMIN/Downloads/FRS_ml/sample_images/interview.jpg`       |
+| `news.jpg`        | `C:/Users/ADMIN/Downloads/deepframe-backend/services/image_grouping/sample_images/news.jpg`            |
+| `conference.jpg`  | `C:/Users/ADMIN/Downloads/deepframe-backend/services/image_grouping/sample_images/conference.jpg`      |
+| `interview.jpg`   | `C:/Users/ADMIN/Downloads/deepframe-backend/services/image_grouping/sample_images/interview.jpg`       |
 
 These are referenced in both `MediaFile` and `MediaItems` with `IsFacesExtracted = 0/1`.
 
@@ -79,14 +104,14 @@ These are referenced in both `MediaFile` and `MediaItems` with `IsFacesExtracted
 
 ## 🧾 Manual Steps for Inserting Data Using SSMS
 
-Follow these steps to manually create the database, tables, and insert sample data using **SQL Server Management Studio (SSMS 2022)**.
+Follow these steps to manually create the database, tables, and insert sample data.
 
 ---
 
 ### 🔧 Step 1: Create the Database
 
 ```sql
-CREATE DATABASE MetaData;
+CREATE DATABASE FaceRecognitionSystem;
 ```
 
 ---
@@ -94,32 +119,53 @@ CREATE DATABASE MetaData;
 ### 🧱 Step 2: Create the Tables
 
 ```sql
-USE MetaData;
+USE FaceRecognitionSystem;
 
--- 1. MediaFile Table
+-- MediaFile
 CREATE TABLE dbo.MediaFile (
-    Id NVARCHAR(10) PRIMARY KEY, -- e.g., 'MF001'
-    FilePath NVARCHAR(255) NOT NULL,
-    FileName NVARCHAR(100) NOT NULL,
-    MediaType VARCHAR(10) CHECK (MediaType IN ('image', 'video')) NOT NULL
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    FilePath NVARCHAR(500) NOT NULL,
+    FileName NVARCHAR(255) NOT NULL,
+    Extensions NVARCHAR(10) NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    ModifiedAt DATETIME2 NULL
 );
 
--- 2. ThumbnailStorage Table
-CREATE TABLE dbo.ThumbnailStorage (
-    Id NVARCHAR(10) PRIMARY KEY, -- e.g., 'TS001'
-    MediaFileId NVARCHAR(10) FOREIGN KEY REFERENCES dbo.MediaFile(Id),
-    FileName NVARCHAR(100) NOT NULL,
-    ThumbnailPath NVARCHAR(255) NOT NULL,
-    CreatedOn DATETIME NOT NULL DEFAULT GETDATE()
-);
-
--- 3. MediaItems Table
+-- MediaItems
 CREATE TABLE dbo.MediaItems (
-    Id NVARCHAR(10) PRIMARY KEY, -- e.g., 'MI001'
-    MediaFileId NVARCHAR(10) FOREIGN KEY REFERENCES dbo.MediaFile(Id),
-    FileName NVARCHAR(100) NOT NULL,
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    MediaFileId INT NOT NULL,
+    Name NVARCHAR(255) NOT NULL,
     IsFacesExtracted BIT NOT NULL DEFAULT 0,
-    FacesExtractedOn DATETIME NULL
+    FacesExtractedOn DATETIME2 NULL,
+    CONSTRAINT FK_MediaItems_MediaFile FOREIGN KEY (MediaFileId) REFERENCES dbo.MediaFile(Id)
+);
+
+-- Persons
+CREATE TABLE dbo.Persons (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    PortraitMediaFileId INT NULL,
+    Name NVARCHAR(255),
+    Rank NVARCHAR(50) NULL,
+    Appointment NVARCHAR(100) NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    ModifiedAt DATETIME2 NULL,
+    CONSTRAINT FK_Persons_Media FOREIGN KEY (PortraitMediaFileId) REFERENCES dbo.MediaFile(Id)
+);
+
+-- Faces
+CREATE TABLE dbo.Faces (
+    Id INT IDENTITY(1,1) PRIMARY KEY, 
+    MediaItemId INT NOT NULL,
+    PersonId INT NULL,
+    BoundingBox NVARCHAR(255) NULL,
+    Embedding VARBINARY(MAX) NULL, 
+    FrameNumber INT NULL,
+    Name NVARCHAR(255),
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    ModifiedAt DATETIME2 NULL,
+    CONSTRAINT FK_Faces_MediaItem FOREIGN KEY (MediaItemId) REFERENCES dbo.MediaItems(Id),
+    CONSTRAINT FK_Faces_Person FOREIGN KEY (PersonId) REFERENCES dbo.Persons(Id)
 );
 ```
 
@@ -128,69 +174,58 @@ CREATE TABLE dbo.MediaItems (
 ### 📥 Step 3: Insert Sample Data
 
 ```sql
-use MetaData;
+USE FaceRecognitionSystem;
 
-INSERT INTO dbo.MediaFile (Id, FilePath, FileName, MediaType)
+-- Insert media files
+INSERT INTO dbo.MediaFile (FilePath, FileName, Extensions, CreatedAt, ModifiedAt)
 VALUES 
-('MF001', 'C:/Users/ADMIN/Downloads/FRS_ml/sample_images/conference.jpg', 'conference.jpg', 'image'),
-('MF002', 'C:/Users/ADMIN/Downloads/FRS_ml/sample_images/interview.jpg', 'interview.jpg', 'image'),
-('MF003', 'C:/Users/ADMIN/Downloads/FRS_ml/sample_images/news.jpg', 'news.jpg', 'image');
+('C:/Users/ADMIN/Downloads/deepframe-backend/services/image_grouping/sample_images/conference.jpg', 'conference.jpg', '.jpg', GETDATE(), GETDATE()),
+('C:/Users/ADMIN/Downloads/deepframe-backend/services/image_grouping/sample_images/interview.jpg', 'interview.jpg', '.jpg', GETDATE(), GETDATE()),
+('C:/Users/ADMIN/Downloads/deepframe-backend/services/image_grouping/sample_images/news.jpg', 'news.jpg', '.jpg', GETDATE(), GETDATE());
 
--- Insert media items 
-INSERT INTO dbo.MediaItems (Id, MediaFileId, FileName, IsFacesExtracted, FacesExtractedOn)
-VALUES 
-('MI001', 'MF001', 'conference.jpg', 1, GETDATE()),
-('MI002', 'MF002', 'interview.jpg', 0, NULL),
-('MI003', 'MF003', 'news.jpg', 1, GETDATE());
-
--- Thumbnails for conference.jpg
-INSERT INTO dbo.ThumbnailStorage (Id, MediaFileId, FileName, ThumbnailPath)
-VALUES
-('TS001', 'MF001', 'conference_TN1.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN1.jpg'),
-('TS002', 'MF001', 'conference_TN2.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN2.jpg'),
-('TS003', 'MF001', 'conference_TN3.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN3.jpg'),
-('TS004', 'MF001', 'conference_TN4.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN4.jpg'),
-('TS005', 'MF001', 'conference_TN5.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN5.jpg'),
-('TS006', 'MF001', 'conference_TN6.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN6.jpg'),
-('TS007', 'MF001', 'conference_TN7.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN7.jpg'),
-('TS008', 'MF001', 'conference_TN8.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN8.jpg');
-
--- Thumbnail for news.jpg
-INSERT INTO dbo.ThumbnailStorage (Id, MediaFileId, FileName, ThumbnailPath)
-VALUES
-('TS009', 'MF003', 'news_TN.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/news_TN.jpg');
+-- Insert media items
+INSERT INTO dbo.MediaItems (MediaFileId, Name, IsFacesExtracted, FacesExtractedOn)
+SELECT Id, FileName, 0, NULL
+FROM dbo.MediaFile
+WHERE FileName IN ('conference.jpg','interview.jpg','news.jpg');
 ```
 
 ---
 
 ### 🔎 Step 4: Verify Data
+
 ```sql
-USE MetaData;
 SELECT * FROM dbo.MediaFile;
 ```
 
 ```sql
-USE MetaData;
 SELECT * FROM dbo.MediaItems;
 ```
 
 ```sql
-USE MetaData;
-SELECT * FROM dbo.ThumbnailStorage;
+SELECT * FROM dbo.Persons;
+```
+
+```sql
+SELECT * FROM dbo.Faces;
 ```
 
 ---
+
 ## 🛠️ Prerequisites
 
 Before running the script, ensure you have:
 
-| Component           | Required Version |
-|---------------------|------------------|
-| SQL Server          | 2022    |
-| SSMS (Management Studio) | (v21)       |
-| Image Folder        | Local folder containing test images (see below) |
+| Component                | Required Version                    |
+| ------------------------ | ----------------------------------- |
+| SQL Server               | 2022                                |
+| SSMS (Management Studio) | 21                                  |
+| Image Folder             | Local folder containing test images |
 
 Example path used for this setup:
-> `C:/Users/ADMIN/Downloads/FRS_ml/sample_images/`
-> 
-> `C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/`
+
+> `C:/Users/ADMIN/Downloads/deepframe-backend/services/image_grouping/sample_images/`
+
+```
+
+---
