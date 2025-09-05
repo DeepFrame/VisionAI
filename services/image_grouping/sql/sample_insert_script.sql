@@ -1,32 +1,46 @@
-USE MetaData;
+USE FaceRecognitionSystem_FRS;
+GO
 
--- Insert media files
-INSERT INTO dbo.MediaFile (Id, FilePath, FileName, MediaType)
-VALUES 
-('MF001', 'C:/Users/ADMIN/Downloads/FRS_ml/sample_images/conference.jpg', 'conference.jpg', 'image'),
-('MF002', 'C:/Users/ADMIN/Downloads/FRS_ml/sample_images/interview.jpg', 'interview.jpg', 'image'),
-('MF003', 'C:/Users/ADMIN/Downloads/FRS_ml/sample_images/news.jpg', 'news.jpg', 'image');
-
--- Insert media items 
-INSERT INTO dbo.MediaItems (Id, MediaFileId, FileName, IsFacesExtracted, FacesExtractedOn)
-VALUES 
-('MI001', 'MF001', 'conference.jpg', 1, GETDATE()),
-('MI002', 'MF002', 'interview.jpg', 0, NULL),
-('MI003', 'MF003', 'news.jpg', 1, GETDATE());
-
--- Thumbnails for conference.jpg
-INSERT INTO dbo.ThumbnailStorage (Id, MediaFileId, FileName, ThumbnailPath)
+-- Insert into dbo.MediaFile with FULL file paths
+INSERT INTO dbo.MediaFile (FilePath, FileName, Extensions, CreatedAt, ModifiedAt)
 VALUES
-('TS001', 'MF001', 'conference_TN1.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN1.jpg'),
-('TS002', 'MF001', 'conference_TN2.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN2.jpg'),
-('TS003', 'MF001', 'conference_TN3.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN3.jpg'),
-('TS004', 'MF001', 'conference_TN4.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN4.jpg'),
-('TS005', 'MF001', 'conference_TN5.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN5.jpg'),
-('TS006', 'MF001', 'conference_TN6.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN6.jpg'),
-('TS007', 'MF001', 'conference_TN7.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN7.jpg'),
-('TS008', 'MF001', 'conference_TN8.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/conference_TN8.jpg');
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/conference.jpg', 'conference.jpg', '.jpg', '2025-08-06 11:59:00', '2025-08-06 11:59:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/conference_hamid.png', 'conference_hamid.png', '.png', '2025-08-15 09:53:00', '2025-08-15 09:53:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/family.jpg', 'family.jpg', '.jpg', '2025-08-11 10:12:00', '2025-08-11 10:12:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/female_anchor.jpg', 'female_anchor.jpg', '.jpg', '2025-08-05 13:15:00', '2025-08-05 13:15:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/GroupM.jpg', 'GroupM.jpg', '.jpg', '2025-08-08 08:42:00', '2025-08-08 08:42:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/Hamid_Mir_at_Studio.png', 'Hamid_Mir_at_Studio.png', '.png', '2025-08-15 09:55:00', '2025-08-15 09:55:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/image-talk-show.jpg', 'image-talk-show.jpg', '.jpg', '2025-08-15 09:54:00', '2025-08-15 09:54:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/image.jpg', 'image.jpg', '.jpg', '2025-08-15 09:53:00', '2025-08-15 09:53:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/image_1.jpg', 'image_1.jpg', '.jpg', '2025-08-13 09:21:00', '2025-08-13 09:21:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/interview.jpg', 'interview.jpg', '.jpg', '2025-08-06 11:59:00', '2025-08-06 11:59:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/interview_anchor.jpg', 'interview_anchor.jpg', '.jpg', '2025-08-15 09:54:00', '2025-08-15 09:54:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/Jenny.jpg', 'Jenny.jpg', '.jpg', '2025-08-11 09:33:00', '2025-08-11 09:33:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/kid.jpg', 'kid.jpg', '.jpg', '2025-08-12 12:00:00', '2025-08-12 12:00:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/lunch.jpg', 'lunch.jpg', '.jpg', '2025-08-12 11:55:00', '2025-08-12 11:55:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/marriage.jpg', 'marriage.jpg', '.jpg', '2025-08-11 09:12:00', '2025-08-11 09:12:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/memory.jpg', 'memory.jpg', '.jpg', '2025-08-12 12:00:00', '2025-08-12 12:00:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/news.jpg', 'news.jpg', '.jpg', '2025-08-06 11:59:00', '2025-08-06 11:59:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/political.jpg', 'political.jpg', '.jpg', '2025-08-07 14:30:00', '2025-08-07 14:30:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/political_leader.png', 'political_leader.png', '.png', '2025-08-15 11:32:00', '2025-08-15 11:32:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/protest.jpg', 'protest.jpg', '.jpg', '2025-08-13 09:20:00', '2025-08-13 09:20:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/radio_pakisatn.jpg', 'radio_pakisatn.jpg', '.jpg', '2025-08-07 15:08:00', '2025-08-07 15:08:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/random.jpg', 'random.jpg', '.jpg', '2025-08-15 09:54:00', '2025-08-15 09:54:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/smiles.jpg', 'smiles.jpg', '.jpg', '2025-08-11 09:55:00', '2025-08-11 09:55:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/strike.jpg', 'strike.jpg', '.jpg', '2025-08-13 09:20:00', '2025-08-13 09:20:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/talk.jpg', 'talk.jpg', '.jpg', '2025-08-13 09:20:00', '2025-08-13 09:20:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/trip.jpg', 'trip.jpg', '.jpg', '2025-08-12 10:33:00', '2025-08-12 10:33:00'),
+('C:/Users/ADMIN/Downloads/DeepFrame-UP/services/image_grouping/image_face_detection/Images/wedding.jpg', 'wedding.jpg', '.jpg', '2025-08-12 10:25:00', '2025-08-12 10:25:00')
+;
 
--- Thumbnail for news.jpg
-INSERT INTO dbo.ThumbnailStorage (Id, MediaFileId, FileName, ThumbnailPath)
-VALUES
-('TS009', 'MF003', 'news_TN.jpg', 'C:/Users/ADMIN/Downloads/FRS_ml/Thumbnails/news_TN.jpg');
+-- Now insert into MediaItems only for these new rows
+INSERT INTO dbo.MediaItems (MediaFileId, Name, IsFacesExtracted, FacesExtractedOn)
+SELECT Id, FileName, 0, NULL
+FROM dbo.MediaFile
+WHERE FileName IN (
+    'conference.jpg','conference_hamid.png','family.jpg','female_anchor.jpg','GroupM.jpg',
+    'Hamid_Mir_at_Studio.png','image-talk-show.jpg','image.jpg','image_1.jpg','interview.jpg',
+    'interview_anchor.jpg','Jenny.jpg','kid.jpg','lunch.jpg','marriage.jpg','memory.jpg',
+    'news.jpg','political.jpg','political_leader.png','protest.jpg','radio_pakisatn.jpg',
+    'random.jpg','smiles.jpg','strike.jpg','talk.jpg','trip.jpg','wedding.jpg'
+);
