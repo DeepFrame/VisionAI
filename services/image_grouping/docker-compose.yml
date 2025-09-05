@@ -1,6 +1,6 @@
 services:
   sqlserver:
-    image: mcr.microsoft.com/mssql/server:2019-latest
+    image: sql_server_image
     container_name: image-grouping-sqlserver
     environment:
       SA_PASSWORD: "${SA_PASSWORD:-pass1234}"
@@ -28,9 +28,11 @@ services:
     volumes:
       - ./person_recognition/logs:/app/services/image_grouping/person_recognition/logs
       - ./image_face_detection/logs:/app/services/image_grouping/image_face_detection/logs
-      - ./Thumbnails:/app/services/image_grouping/Thumbnails
+      - ./Thumbnails:/app/services/image_grouping/image_face_detection/Thumbnails
       - ./individuals_portraits:/app/services/image_grouping/individuals_portraits:rw
       - image_grouping_uploaded:/app/services/image_grouping/image_face_detection/Images:ro
+      - "C:/Users/user1/Desktop/Deep-Frame/services/image_grouping/Thumbnails:/app/services/image_grouping/image_face_detection/Thumbnails:rw"
+      - "./cache/deepface:/root/.deepface:rw"
     env_file:
       - docker/.env.example
       - ./.env
@@ -62,3 +64,4 @@ volumes:
 networks:
   app-network:
     driver: bridge  
+
