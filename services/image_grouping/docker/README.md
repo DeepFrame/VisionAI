@@ -16,11 +16,6 @@ This repository contains the **Image Grouping Service**, which performs **face d
 - [Dockerfile](#dockerfile)
 - [docker-compose](#docker-compose)
 - [Docker Setup](#docker-setup)
-- [Running the Service](#running-the-service)
-  - [One-shot mode](#one-shot-mode)
-  - [Loop mode](#loop-mode)
-- [Healthcheck](#healthcheck)
-- [Logging](#logging)
 
 ---
 
