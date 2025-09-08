@@ -30,6 +30,9 @@ def should_recluster():
 
 def full_pipeline_once(recluster=False, dry_run=False):
     """Run detection + recognition once."""
+    print("[00] Reprocessing missing faces and thumbnails...")
+    reprocess_media_missing_faces()
+    check_thumbnails()
     print("[01] Detecting faces...")
     batch_process_from_db(dry_run=dry_run)
     print("[02] Running recognition pipeline...")
@@ -60,9 +63,6 @@ def main():
 
     args = parser.parse_args()
     
-    reprocess_media_missing_faces()
-    check_thumbnails()
-    
     if args.test:
         test_single_image(args.test, dry_run=args.dry_run)
     elif args.db:
@@ -91,3 +91,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
