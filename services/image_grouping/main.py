@@ -59,10 +59,10 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Produces logs without DB changes")
 
     args = parser.parse_args()
-
+    
     reprocess_media_missing_faces()
     check_thumbnails()
-
+    
     if args.test:
         test_single_image(args.test, dry_run=args.dry_run)
     elif args.db:
@@ -91,5 +91,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
