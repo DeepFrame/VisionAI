@@ -94,34 +94,60 @@ python main.py --recluster
 ## Project Structure
 
 ```
-.
-├── .env                        # Environment variables (DB credentials, app configs)
-├── config.py                   # Database connection and global config loader
-├── main.py                     # CLI entry point to run detection/recognition pipeline
-├── requirements.txt            # Python dependencies for local development
-├── docker-compose.yml          # Docker Compose config for running services
-├── docker/
-│   ├── .env.example            # Example env file for containerized setup
-│   ├── Dockerfile              # Image build instructions
-│   ├── docker-entrypoint.sh    # Entrypoint script to bootstrap container
-│   ├── healthcheck.py          # Healthcheck script for container monitoring
-│   ├── requirements.txt        # Python dependencies inside the container
-│   └── README.md               # Notes for Docker usage and setup
-├── image_face_detection/       # Face detection package
-│   ├── detect_faces.py         # Detects faces, crops, and saves thumbnails
-│   ├── logger_config.py        # Logger configuration for detection module
-│   └── logs/                   # Logs generated during face detection
-├── person_recognition/         # Face recognition package
-│   ├── recognize_persons.py    # Face embedding generation and clustering logic
-│   ├── logger_config.py        # Logger configuration for recognition module
-│   ├── logs/                   # Logs generated during recognition
-│   └── sql/                    # SQL scripts for DB interactions
-│       ├── upsert_person.sql   # Insert/update persons in database
-│       └── link_tables.sql     # Manage relationships between DB tables
-│   └── Notebooks/              # Jupyter notebooks for experiments and demos
-│       ├── Face_Recognition_System_(FRS).ipynb  
-│       └── README.md           
-└── README.md                   # Project overview, setup, and usage instructions
+image_grouping/                                    # Face recognition pipeline service
+├── .env                                           # Environment variables (DB, configs)
+├── FaceRecognitionSystem.png                      # System architecture diagram
+├── Notebooks/                                     # Jupyter notebooks & docs
+│   ├── Face_Recognition_System_(FRS).ipynb        # End-to-end recognition pipeline
+│   ├── README.md                                  # Notes for notebooks
+│   └── face-recognition-system-frs.pdf            # Notebook exported as PDF
+├── README.md                                      # Service overview
+├── config.py                                      # App & DB configuration
+├── docker/                                        # Docker deployment setup
+│   ├── .env.example                               # Example environment file
+│   ├── Dockerfile                                 # Container build instructions
+│   ├── README.md                                  # Docker usage notes
+│   ├── docker-entrypoint.sh                       # Startup script
+│   ├── healthcheck.py                             # Service health check
+│   ├── requirements.txt                           # Python dependencies
+│   └── requirements_locked.txt                    # Frozen dependency versions
+├── docker-compose.yml                             # Multi-service orchestration
+├── image_face_detection/                          # Face detection module
+│   ├── Images/                                    # Raw input images
+│       ├── GroupM.jpg, … wedding.jpg              # (multiple test samples)
+│       └── README.md                              # Notes about test images
+│   ├── Thumbnails/                                # Cropped detected faces
+│       ├── conference_TN1.jpg … news_TN.jpg       # (face thumbnails)
+│   ├── Thumbnails.jpeg                            # Combined thumbnail preview
+│   ├── detect_faces.py                            # Face detection + cropping logic
+│   ├── logger_config.py                           # Logging setup
+│   ├── logs/                                      # Detection logs
+│       └── face_detection.log
+│   └── README.md                                  # Detection module docs
+├── main.py                                        # CLI entry point
+├── person_recognition/                            # Person recognition module
+│   ├── recognize_persons.py                       # Face embedding + clustering
+│   ├── logger_config.py                           # Logging setup
+│   ├── logs/                                      # Recognition logs
+│       └── embeddings_clustering.log
+│   ├── README.md                                  # Recognition module docs
+│   └── sql/                                       # SQL queries for recognition
+│       ├── link_tables.sql                        # Link face/person tables - SQL Procedure
+│       ├── upsert_person.sql                      # Insert/update person records - SQL Procedure
+│       └── README.md
+├── requirements.txt                               # Service dependencies
+├── sample_images/                                 # Example input images
+│   ├── conference.jpg, interview.jpg, news.jpg    # (sample images)
+│   └── README.md
+└── sql/                                           # Core database schema & queries
+    ├── Portrait.sql                               # Portrait handling script
+    ├── aditionals.sql                             # Extra SQL utilities
+    ├── clusters_display.sql                       # View clusters
+    ├── create_database&tables.sql                 # DB schema creation
+    ├── delete.sql                                 # Delete data queries
+    ├── sample_insert_script.sql                   # Insert sample records
+    ├── show_tables.sql                            # Show database tables
+    └── README.md
 ```
 
 ## Logging
