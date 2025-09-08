@@ -6,7 +6,6 @@ import numpy as np
 from datetime import datetime
 from retinaface import RetinaFace
 from tabulate import tabulate
-
 #from .config import SQL_CONNECTION_STRING, THUMBNAIL_SAVE_PATH
 from config import SQL_CONNECTION_STRING, THUMBNAIL_SAVE_PATH
 from config import OLD_PREFIX, NEW_PREFIX, SYSTEM_THUMBNAILS_PATH
@@ -73,7 +72,7 @@ def reprocess_media_missing_faces(dry_run: bool = False):
 
     except Exception as e:
         logger.error(f"reprocess_media_missing_faces failed: {e}")
-        
+
 def check_thumbnails(dry_run=False):
     """
     Check if thumbnails exist for each entry in dbo.Faces.
@@ -101,10 +100,8 @@ def check_thumbnails(dry_run=False):
 
         for face_id, bbox_str, face_name, file_path, file_name in rows:
             try:
-                # convert DB path -> container path
                 full_path = to_container_path(file_path)
 
-                # thumbnail naming scheme: <OriginalName>_TN<index>.jpg
                 base_name, _ = os.path.splitext(file_name)
                 thumb_name = face_name if face_name else f"{base_name}_TN{face_id}.jpg"
                 thumb_path = os.path.join(thumbnail_base_path, thumb_name)
@@ -115,13 +112,11 @@ def check_thumbnails(dry_run=False):
 
                 logger.info(f"[Missing] Recreating thumbnail: {thumb_name}")
 
-                # read original image
                 img = cv2.imread(full_path)
                 if img is None:
                     logger.error(f"Could not read original image: {full_path}")
                     continue
 
-                # parse bounding box
                 if not bbox_str:
                     logger.warning(f"No bounding box for FaceId {face_id}")
                     continue
@@ -149,7 +144,7 @@ def check_thumbnails(dry_run=False):
 
     except Exception as e:
         logger.error(f"check_thumbnails() failed: {e}")
-        
+
 # DATABASE Unprocessed files and Thumbnails Query Processing
 def get_unprocessed_files():
     try:
@@ -160,7 +155,7 @@ def get_unprocessed_files():
         SELECT MI.Id, MF.FilePath, MI.Name
         FROM dbo.MediaItems MI
         JOIN dbo.MediaFile MF ON MI.MediaFileId = MF.Id
-        WHERE MI.IsFacesExtracted = 0 AND LOWER(MF.Extensions) IN ('.jpg', '.jpeg', '.png', '.bmp', '.tiff')
+        WHERE MI.IsFacesExtracted = 0 AND LOWER(MF.Extension) IN ('.jpg', '.jpeg', '.png', '.bmp', '.tiff')
         """
         cursor.execute(query)
         rows = cursor.fetchall()
@@ -274,9 +269,10 @@ def update_database(media_item_id, face_bboxes, filename=None):
                     updated_count += 1
                 else:
                     cursor.execute("""
-                        INSERT INTO dbo.Faces (MediaItemId, BoundingBox, Name, CreatedAt)
-                        VALUES (?, ?, ?, ?)
-                    """, media_item_id, bbox_str, filename, datetime.now())
+                        INSERT INTO dbo.Faces (MediaItemId, BoundingBox, Name, CreatedAt, IsUserVerified)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, media_item_id, bbox_str, filename, datetime.now(), 0)  # 0 = false
+
                     inserted_count += 1
             except Exception as e:
                 logger.warning(f"Failed to process bounding box {bbox}: {e}")
@@ -381,13 +377,13 @@ def detect_and_crop_faces(image_path, media_item_id=None, dry_run=False):
 
             filename = f"{name_without_ext}_TN{idx + 1}{ext}"
             save_path = os.path.join(thumbnail_base_path, filename)
-            sys_save_path = os.path.join(system_thumb_path, filename)
+            #sys_save_path = os.path.join(system_thumb_path, filename)
             
             try:
                 cv2.imwrite(save_path, processed_face)
-                cv2.imwrite(sys_save_path, processed_face)
+                #cv2.imwrite(sys_save_path, processed_face)
 
-                logger.info(f"Saved in system, the face {idx+1} to \n{sys_save_path} and \n{save_path}")
+                logger.info(f"Saved in system, the face {idx+1} to \n{save_path}")
 
                 if not dry_run:
                     logger.info(f"Saved square (112x112) face {idx+1} to {save_path}")
@@ -499,9 +495,9 @@ def test_detect_and_crop_faces(image_path, media_item_id=None, dry_run=False):
             save_path = os.path.join(thumbnail_base_path, filename)
             cv2.imwrite(save_path, processed_face)
 
-            sys_save_path = os.path.join(system_thumb_path, filename)
-            cv2.imwrite(sys_save_path, processed_face)
-            logger.info(f"Saved in system, the face {idx+1} to \n{sys_save_path} and \n{save_path}")
+            #sys_save_path = os.path.join(system_thumb_path, filename)
+            #cv2.imwrite(sys_save_path, processed_face)
+            #logger.info(f"Saved in system, the face {idx+1} to \n{sys_save_path} and \n{save_path}")
             
             logger.info(f"[INFO] Saved face {idx+1} to {filename}")
 
