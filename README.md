@@ -15,31 +15,70 @@ At its core, the system leverages **RetinaFace** for face detection and **FaceNe
 With its modular pipeline and configurable architecture, the Face Recognition System can be adapted for diverse use cases including digital asset management, security monitoring, media analysis, and research.
 ## Project Structure
 ```bash
-├── deepframe-backend/                             # Backend services
-│ ├── services/image_grouping/                     # Face recognition pipeline service
-│ │ └──  .env                                      # Environment variables (DB credentials, configs)
-│ │ ├── config.py                                  # Database connection
-│ │ ├── main.py                                    # Entry point for CLI
-│ │ ├── requirements.txt                           # Install required dependencies
-│ │ ├── image_face_detection/                      # Face detection module
-│ │ │   ├── detect_faces.py                        # Face detection, cropping & thumbnails
-│ │ │   └── logger_config.py                       # Logs configuration
-│ │ │   └── logs/                                  # Detection logs
-│ │ ├── person_recognition/                        # Face recognition module
-│ │ │   ├── recognize_persons.py                   # Embedding + clustering logic
-│ │ │   └── logger_config.py                       # Logs configuration
-│ │ │   └── logs/                                  # Recognition logs
-│ │ │   └── sql/
-│ │ │   │   ├── upsert_person.sql
-│ │ │   │   └── link_tables.sql
-│ │ ├── Notebooks/                 
-│ │ │ └── Face_Recognition_System_(FRS).ipynb      # Face detection and recognition jupyter notebook
-│ │ └── README.md
-├── docs/
-│ ├── Face_Recognition_System_Manual.pdf
-│ └── immich_face_recognition.md
-├── backend/                                       # Backend files
-│ ├── ....
+deepframe-backend-main/                            # Root project folder
+├── DemoVideos/                                    # Demo showcase videos
+│   ├── Automated_Face_Recognition_System_with_Re_Clustering.mp4
+│   ├── Detection and Recognition Pipeline.mp4
+│   ├── Face Detection.mp4
+│   └── README.md                                  # Notes about demo videos
+├── Docs/                                          # Documentation
+│   ├── Face_Recognition_System_Manual.pdf         # User manual
+│   ├── immich_face_flow.svg                       # System architecture diagram
+│   └── immich_face_recognition.md                 # Technical docs
+├── README.md                                      # Project overview
+└── services/                                      # Backend services
+    └── image_grouping/                            # Face recognition pipeline service
+        ├── .env                                   # Environment configs (local dev)
+        ├── FaceRecognitionSystem.png              # System diagram
+        ├── Notebooks/                             # Jupyter notebooks
+        │   ├── Face_Recognition_System_(FRS).ipynb
+        │   ├── README.md
+        │   └── face-recognition-system-frs.pdf
+        ├── README.md
+        ├── config.py                              # Database & app configuration
+        ├── docker/                                # Docker setup for deployment
+        │   ├── .env.example
+        │   ├── Dockerfile
+        │   ├── README.md
+        │   ├── docker-entrypoint.sh
+        │   ├── healthcheck.py
+        │   ├── requirements.txt
+        │   └── requirements_locked.txt
+        ├── docker-compose.yml                     # Docker services orchestration
+        ├── image_face_detection/                  # Face detection module
+        │   ├── Images/                            # Raw images for testing
+        │   │   ├── GroupM.jpg … wedding.jpg       # (multiple test images)
+        │   ├── Thumbnails/                        # Face thumbnails
+        │   │   ├── conference_TN1.jpg … news_TN.jpg
+        │   ├── Thumbnails.jpeg
+        │   ├── detect_faces.py                    # Face detection & cropping
+        │   ├── logger_config.py                   # Logging setup
+        │   └── README.md
+        ├── main.py                                # CLI entry point
+        ├── person_recognition/                    # Person recognition module
+        │   ├── recognize_persons.py               # Embedding + clustering logic
+        │   ├── logger_config.py                   # Logging setup
+        │   ├── README.md
+        │   └── sql/                               # Recognition SQL scripts
+        │       ├── link_tables.sql
+        │       ├── upsert_person.sql
+        │       └── README.md
+        ├── requirements.txt                       # Python dependencies
+        ├── sample_images/                         # Sample input images
+        │   ├── conference.jpg
+        │   ├── interview.jpg
+        │   ├── news.jpg
+        │   └── README.md
+        └── sql/                                   # Database schema & scripts
+            ├── Portrait.sql
+            ├── aditionals.sql
+            ├── clusters_display.sql
+            ├── create_database&tables.sql
+            ├── delete.sql
+            ├── sample_insert_script.sql
+            ├── show_tables.sql
+            └── README.md
+
 ```
 
 ## Setup and Installation
