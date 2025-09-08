@@ -33,6 +33,47 @@ system_thumb_path = SYSTEM_THUMBNAILS_PATH
 os.makedirs(thumbnail_base_path, exist_ok=True)
 os.makedirs(system_thumb_path, exist_ok=True)
 
+def reprocess_media_missing_faces(dry_run: bool = False):
+    """
+    Find MediaItems marked as extracted (IsFacesExtracted=1 and FacesExtractedOn IS NOT NULL)
+    but with no corresponding rows in dbo.Faces. Re-run detection and write into dbo.Faces.
+    """
+    try:
+        with pyodbc.connect(SQL_CONNECTION_STRING) as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT mi.Id AS MediaItemId, mf.FilePath, mf.FileName
+                    FROM dbo.MediaItems mi
+                    INNER JOIN dbo.MediaFile mf ON mi.MediaFileId = mf.Id
+                    WHERE mi.IsFacesExtracted = 1
+                      AND mi.FacesExtractedOn IS NOT NULL
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM dbo.Faces f
+                          WHERE f.MediaItemId = mi.Id
+                      )
+                """)
+                rows = cur.fetchall()
+
+        if not rows:
+            logger.info("All processed MediaItems have Faces records. Nothing to reprocess.")
+            return
+
+        logger.info(f"Reprocessing {len(rows)} MediaItems with missing Faces rows...")
+        for media_item_id, file_path, file_name in rows:
+            try:
+                full_path = to_container_path(file_path)
+            except Exception as e:
+                logger.error(f"Path mapping failed for MediaItemId {media_item_id}: {e}")
+                continue
+
+            ok = detect_and_crop_faces(full_path, media_item_id=media_item_id, dry_run=dry_run)
+            if not ok:
+                logger.warning(f"Re-detect skipped/failed for MediaItemId {media_item_id}")
+
+    except Exception as e:
+        logger.error(f"reprocess_media_missing_faces failed: {e}")
+        
 def check_thumbnails(dry_run=False):
     """
     Check if thumbnails exist for each entry in dbo.Faces.
