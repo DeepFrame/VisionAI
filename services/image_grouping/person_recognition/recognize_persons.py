@@ -22,7 +22,7 @@ from .logger_config import get_logger
 logger = get_logger()
     
 # DB connection
-from config import SQL_CONNECTION_STRING, OLD_PREFIX, NEW_PREFIX
+from config import SQL_CONNECTION_STRING, OLD_PREFIX, NEW_PREFIX, ROOT_PATH_thumb
 
 conn_str = SQL_CONNECTION_STRING
 
@@ -54,10 +54,10 @@ def get_faces_with_bboxes():
     cursor.execute("""
         SELECT 
             F.Id, MF.FilePath, MF.FileName, F.BoundingBox
-        FROM dbo.Faces F
-        JOIN dbo.MediaItems MI ON F.MediaItemId = MI.Id
-        JOIN dbo.MediaFile MF ON MI.MediaFileId = MF.Id
-        WHERE F.Embedding IS NULL
+            FROM dbo.Faces F
+            JOIN dbo.MediaItems MI ON F.MediaItemId = MI.Id
+            JOIN dbo.MediaFile MF ON MI.MediaFileId = MF.Id
+            WHERE F.Embedding IS NULL
     """)
     rows = cursor.fetchall()
     cursor.close()
@@ -294,13 +294,14 @@ def get_faces_with_paths(conn_str=conn_str):
     results = []
     for row in rows:
         person_id, face_id, face_name, file_name, embedding = row
-        db_thumb_path = os.path.join(NEW_PREFIX, "Thumbnails", file_name)
-        face_image_path = to_container_path(db_thumb_path)
+        db_thumb_path = os.path.join(ROOT_PATH_thumb, "Thumbnails", file_name)
+        #face_image_path = to_container_path(db_thumb_path)
+        print(db_thumb_path, "\n")
         results.append({
             "PersonId": person_id,
             "FaceId": face_id,
             "FaceName": face_name,
-            "FaceImagePath": face_image_path,
+            "FaceImagePath": db_thumb_path,
             "Embedding": embedding,
         })
     return results, ["PersonId", "FaceId", "FaceName", "FaceImagePath", "Embedding"]
@@ -350,10 +351,10 @@ def assign_clusters(labels, face_ids, recluster=False, existing_person_id=None, 
                 continue
             if not dry_run:
                 cursor.execute("""
-                    INSERT INTO dbo.Persons (Name, Rank, Appointment, CreatedAt)
+                    INSERT INTO dbo.Persons (Name, Rank, Appointment, CreatedAt, Type)
                     OUTPUT INSERTED.Id
-                    VALUES (?, ?, ?, ?)
-                """, f"Unknown-{int(cluster_id)}", None, None, datetime.now())
+                    VALUES (?, ?, ?, ?, ?)
+                """, f"Unknown-{int(cluster_id)}", None, None, datetime.now(), 0)
             person_id = int(cursor.fetchone()[0])
 
             logger.info(f"Created new PersonId={person_id} for cluster {cluster_id}")
@@ -437,7 +438,7 @@ def recluster_unlabelled_faces(eps=0.35, min_samples=3, similarity_threshold=0.7
     logger.info(f"Found {len(labelled_ids)} labelled faces for reclustering.")
     if labelled_embeddings.size == 0:
         print("[INFO] No labelled embeddings found for reclustering.")
-        return
+        #return
     
     unlabelled_rows = get_unassigned_faces(recluster=False)
     unlabelled_ids, unlabelled_embeddings = [], []
