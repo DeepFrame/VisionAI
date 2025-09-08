@@ -7,7 +7,8 @@ from image_face_detection.detect_faces import (
     batch_process_from_db,
     continuous_batch_process,
     countdown_timer,
-    check_thumbnails
+    check_thumbnails,
+    reprocess_media_missing_faces
 )
 from person_recognition.recognize_persons import main as recognize_persons_main
 
@@ -58,7 +59,8 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Produces logs without DB changes")
 
     args = parser.parse_args()
-    
+
+    reprocess_media_missing_faces()
     check_thumbnails()
 
     if args.test:
@@ -89,4 +91,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
