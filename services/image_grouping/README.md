@@ -26,7 +26,7 @@ cd deepframe-backend/services/image_grouping
 pip install -r requirements.txt
 ```
 
-3. Configure your database connection in `config.py`:
+3. Configure your database connection in `.env`:
 
 ```python
 SQL_CONNECTION_STRING = "DRIVER={SQL Server};SERVER=your_server;DATABASE=your_db;UID=user;PWD=password"
@@ -34,10 +34,10 @@ SQL_CONNECTION_STRING = "DRIVER={SQL Server};SERVER=your_server;DATABASE=your_db
 
 4. Ensure your database contains the required tables with required fields:
 
-* `MediaFile`
-* `MediaItems`
-* `Faces`
-* `Persons`
+* `MediaFile`: Id, FilePath, FileName, Extensions, CreatedAt, ModifiedAt
+* `MediaItems`: Id, MediaFileId, Name, IsFacesExtracted, FacesExtractedOn
+* `Faces`: Id, MediaItemId, PersonId, BoundingBox, Embedding, FrameNumber, Name, CreatedAt, ModifiedAt
+* `Persons`: Id, PortraitMediaFileId, Name, Rank, Appointment, CreatedAt, ModifiedAt
 
 ## Usage
 
