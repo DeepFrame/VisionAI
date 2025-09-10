@@ -1,0 +1,13 @@
+SQL_CONNECTION_STRING="Driver={ODBC Driver 17 for SQL Server};Server={123.123.1.123};Database=database;UID=admin;PWD=abc1234;Encrypt=no;TrustServerCertificate=no;"
+
+THUMBNAIL_SAVE_PATH="/app/image_face_detection/Thumbnails"
+
+IMAGE_SAVE_PATH="/app/image_face_detection/Images"
+
+DB_PREFIX="//123.123.1.123/files/Uploaded"
+
+CONTAINER_IMAGES_ROOT="/app/image_face_detection/Images"
+
+ROOT_PATH="/app/image_face_detection"
+
+SYSTEM_STORAGE="Thumbnails"

@@ -1,0 +1,5 @@
+cd C:\Users\user1\Desktop\Deep-Frame\DEEPFRAME-User1
+docker load  -i image_grouping_sqlserver.tar
+docker compose build --no-cache
+docker compose up
+docker compose down
