@@ -26,8 +26,7 @@ services:
     depends_on:
       - sqlserver      
     volumes:
-      - ./person_recognition/logs:/app/person_recognition/logs
-      - ./image_face_detection/logs:/app/image_face_detection/logs
+      - ./logs:/app/logs
       - ./Thumbnails:/app/image_face_detection/Thumbnails
       - ./individuals_portraits:/app/individuals_portraits:rw
       - image_grouping_uploaded:/app/image_face_detection/Images:ro
@@ -72,4 +71,5 @@ volumes:
 
 networks:
   app-network:
+
     driver: bridge  
