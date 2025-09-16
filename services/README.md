@@ -1,4 +1,4 @@
-# VisionAi Services
+# VisionAI Services
 
 ### 1. `image_grouping`
 - Full project with all source files (`detect_faces.py`, `recognize_persons.py`, `config.py`, `main.py`).
