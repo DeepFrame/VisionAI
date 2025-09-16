@@ -13,6 +13,39 @@ At its core, the system leverages **RetinaFace** for face detection and **FaceNe
 - A clear logging and auditing trail to support monitoring, debugging, and traceability.  
 
 With its modular pipeline and configurable architecture, the Face Recognition System can be adapted for diverse use cases including digital asset management, security monitoring, media analysis, and research.
+
+## Python Libraries
+
+| Category | Library | Purpose |
+|----------|---------|---------|
+| Core & Utilities | `argparse` | Command-line argument parsing |
+|  | `os` | File handling and path operations |
+|  | `sys` | System utilities |
+|  | `shutil` | File operations (copy, move, delete) |
+|  | `re` | Regular expressions |
+|  | `posixpath` | Cross-platform path handling |
+|  | `time` | Timing, delays, countdowns |
+|  | `datetime` | Timestamp handling |
+|  | `json` | JSON serialization and parsing |
+|  | `logging` | Logging system events |
+|  | `collections` | Specialized data structures (e.g., defaultdict) |
+| Environment & Database | `python-dotenv` | Load environment variables from `.env` files |
+|  | `pyodbc` | Connect and interact with Microsoft SQL Server |
+| Image Processing | `opencv-python` (`cv2`) | Image I/O, manipulation, cropping, resizing |
+|  | `numpy` | Numerical computations, arrays |
+|  | `pandas` | Tabular data handling |
+|  | `openpyxl` | Excel I/O |
+|  | `matplotlib.pyplot` | Visualize embeddings or clusters in Colab |
+|  | `math` | Mathematical operations |
+| Face Detection & Recognition | `retina-face` | Face detection and bounding boxes |
+|  | `keras-facenet` | Extract face embeddings using FaceNet |
+| Clustering & ML | `scikit-learn` | DBSCAN clustering, cosine similarity |
+|  | `umap-learn` | Dimensionality reduction for embeddings |
+|  | `cosine_similarity` (from `sklearn.metrics.pairwise`) | Compute similarity between embeddings |
+|  | `onnxruntime` | Optimized model inference |
+| Reporting & Visualization | `tabulate` | Nicely formatted tables in console and log files |
+| Google Colab | `google.colab.patches` | `cv2_imshow` for displaying images in Colab |
+
 ## Project Structure
 ```bash
 deepframe-backend-main/                            # Root project folder
