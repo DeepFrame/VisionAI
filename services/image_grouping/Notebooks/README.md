@@ -1,4 +1,4 @@
-# Face Detection and Clustering Module
+# VisionAI - Face Detection and Recognition System
 
 This repository provides a complete pipeline for **face detection, embedding extraction, clustering, and portrait selection** using Python. The system can handle multiple images, remove blurry faces, and organize faces by identity.
 
