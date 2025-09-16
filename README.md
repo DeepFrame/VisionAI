@@ -1,4 +1,4 @@
-# Face Recognition System
+# VisionAI
 
 The **Face Recognition System** is designed to provide an end-to-end solution for managing and identifying faces across large collections of images and media files. It combines modern deep learning models with robust database integration, offering both accuracy and scalability. 
 
