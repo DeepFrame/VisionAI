@@ -1,4 +1,4 @@
-# Face Recognition System
+# VisionAI
 
 This repository provides a **face detection and recognition pipeline** that integrates detection, embedding generation, and clustering of faces. It supports single-image testing, batch processing from a database, continuous monitoring, and automated pipelines for recurring processing.
 
