@@ -1,6 +1,6 @@
-# Automated Face Recognition System - Executable Version
+# VisionAI - Executable Version
 
-This folder contains the **executable-ready version** of the Automated Face Recognition System. It is designed to detect, recognize, and cluster faces automatically from media files and update the database accordingly.
+This folder contains the **executable-ready version** of the Automated Face Recognition System **VisionAI**. It is designed to detect, recognize, and cluster faces automatically from media files and update the database accordingly.
 
 ---
 
