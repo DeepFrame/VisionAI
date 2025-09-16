@@ -1,4 +1,4 @@
-# Automated Face Recognition System - Docker Version
+# VisionAI - Docker Version
 
 ## Overview
 
