@@ -60,8 +60,7 @@ os.makedirs(thumbnail_base_path, exist_ok=True)
 os.makedirs(system_thumb_path, exist_ok=True)
 
 # ***************************** LOGGER_CONFIG.py *****************************
-BASE_DIR = os.path.dirname(__file__)
-LOG_DIR = os.path.join(BASE_DIR, "logs")
+LOG_DIR = os.path.join(CURRENT_DIR, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 LOG_PATH = os.path.join(LOG_DIR, "detection_recognition.log")
