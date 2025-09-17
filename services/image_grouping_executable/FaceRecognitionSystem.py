@@ -30,6 +30,20 @@ import shutil
 
 import re, posixpath
 
+import tensorflow as tf
+
+# ***************************** GPU SETUP *****************************
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        print(f"[INFO] {len(gpus)} GPU(s) detected: {[gpu.name for gpu in gpus]}")
+    except RuntimeError as e:
+        print(f"[ERROR] GPU setup failed: {e}")
+else:
+    print("[INFO] No GPU detected, running on CPU")
+
 # ***************************** CONFIG.py *****************************
 if getattr(sys, 'frozen', False):  
     exe_dir = os.path.dirname(sys.executable)
