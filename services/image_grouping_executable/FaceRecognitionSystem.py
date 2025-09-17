@@ -30,7 +30,7 @@ import shutil
 
 import re, posixpath
 
-import tensorflow as tf
+"""import tensorflow as tf
 
 # ***************************** GPU SETUP *****************************
 gpus = tf.config.list_physical_devices('GPU')
@@ -42,7 +42,7 @@ if gpus:
     except RuntimeError as e:
         print(f"[ERROR] GPU setup failed: {e}")
 else:
-    print("[INFO] No GPU detected, running on CPU")
+    print("[INFO] No GPU detected, running on CPU")"""
 
 # ***************************** CONFIG.py *****************************
 if getattr(sys, 'frozen', False):  
@@ -62,7 +62,7 @@ SYSTEM_THUMBNAILS_PATH = THUMBNAIL_SAVE_PATH
 
 os.makedirs(THUMBNAIL_SAVE_PATH, exist_ok=True)
 
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # Load environment variables
 conn_str = SQL_CONNECTION_STRING
