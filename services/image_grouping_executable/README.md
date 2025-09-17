@@ -6,8 +6,8 @@ This folder contains the **executable-ready version** of the Automated Face Reco
 
 ## 1. Python File Functionalities
 
-- **`main.py`** and supporting scripts include:
-  - Detection and cropping of faces from unprocessed media.
+- **`VisionAI.py`** and supporting scripts include:
+  - Detection using **`retina-face`** and cropping of faces from unprocessed media.
   - Thumbnail generation and saving in `Thumbnails/`.
   - Face embedding generation using **FaceNet**.
   - Clustering of unlabelled faces using **DBSCAN** and optional reclustering.
