@@ -29,8 +29,18 @@ from sklearn.metrics.pairwise import cosine_similarity
 import shutil
 
 import re, posixpath
+import tensorflow as tf
 
-"""import tensorflow as tf
+print("""
+ __   __  ___   _______  ___   _______  __    _  _______  ___  
+|  | |  ||   | |       ||   | |       ||  |  | ||   _   ||   | 
+|  |_|  ||   | |  _____||   | |   _   ||   |_| ||  |_|  ||   | 
+|       ||   | | |_____ |   | |  | |  ||       ||       ||   | 
+|       ||   | |_____  ||   | |  |_|  ||  _    ||       ||   | 
+ |     | |   |  _____| ||   | |       || | |   ||   _   ||   | 
+  |___|  |___| |_______||___| |_______||_|  |__||__| |__||___| 
+
+""")
 
 # ***************************** GPU SETUP *****************************
 gpus = tf.config.list_physical_devices('GPU')
@@ -42,16 +52,16 @@ if gpus:
     except RuntimeError as e:
         print(f"[ERROR] GPU setup failed: {e}")
 else:
-    print("[INFO] No GPU detected, running on CPU")"""
+    print("[INFO] No GPU detected, running on CPU")
 
 # ***************************** CONFIG.py *****************************
-if getattr(sys, 'frozen', False):  
-    exe_dir = os.path.dirname(sys.executable)
-    dotenv_path = os.path.join(exe_dir, ".env")
-else:
-    dotenv_path = os.path.join(os.getcwd(), ".env")
+#if getattr(sys, 'frozen', False):  
+#    exe_dir = os.path.dirname(sys.executable)
+#    dotenv_path = os.path.join(exe_dir, ".env")
+#else:
+#    dotenv_path = os.path.join(os.getcwd(), ".env")
 
-load_dotenv(dotenv_path)
+load_dotenv()
 
 SQL_CONNECTION_STRING = os.getenv("SQL_CONNECTION_STRING")
 
@@ -62,7 +72,7 @@ SYSTEM_THUMBNAILS_PATH = THUMBNAIL_SAVE_PATH
 
 os.makedirs(THUMBNAIL_SAVE_PATH, exist_ok=True)
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+#os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # Load environment variables
 conn_str = SQL_CONNECTION_STRING
