@@ -1,1 +1,1 @@
-![Thumbnail Comparison](Docs/Thumbnails_Comparison.png)
+![Thumbnail Comparison](Thumbnails_Comparison.png)
