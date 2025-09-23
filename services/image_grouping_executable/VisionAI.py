@@ -55,11 +55,11 @@ else:
     print("[INFO] No GPU detected, running on CPU")
 
 # ***************************** CONFIG.py *****************************
-#if getattr(sys, 'frozen', False):  
-#    exe_dir = os.path.dirname(sys.executable)
-#    dotenv_path = os.path.join(exe_dir, ".env")
-#else:
-#    dotenv_path = os.path.join(os.getcwd(), ".env")
+if getattr(sys, 'frozen', False):  
+    exe_dir = os.path.dirname(sys.executable)
+    dotenv_path = os.path.join(exe_dir, ".env")
+else:
+    dotenv_path = os.path.join(os.getcwd(), ".env")
 
 load_dotenv()
 
