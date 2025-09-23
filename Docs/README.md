@@ -9,4 +9,4 @@
 | **Handling Outliers**             | Faces below `min_score = 0.7` or embeddings not assigned remain unclustered until further processing. | Faces below similarity threshold `(0.75)` remain unassigned until DBSCAN clustering.                   |
 | **Acceleration / Hardware Support**| InsightFace session (CUDA, OpenVINO, CPU).     | TensorFlow GPU/CPU; memory growth enabled for GPU.                                           |
 | **Embedding Storage / DB**        | Embeddings serialized (`serialize_np_array`) and stored externally (e.g., DB or vector store). | Embeddings stored in database (varbinary or JSON). Used for clustering and recognition.      |
-| **Additional Features**           | No portrait generation | Portrait generation (medoid + sharpness) |
+| **Additional Features**           | Portrait generation | Portrait generation (medoid + sharpness) |
