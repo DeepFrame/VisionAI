@@ -61,7 +61,7 @@ if getattr(sys, 'frozen', False):
 else:
     dotenv_path = os.path.join(os.getcwd(), ".env")
 
-load_dotenv()
+load_dotenv(dotenv_path)
 
 SQL_CONNECTION_STRING = os.getenv("SQL_CONNECTION_STRING")
 
