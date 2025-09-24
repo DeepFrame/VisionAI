@@ -1,5 +1,5 @@
 # ***************************** IMPORTS *****************************
-import argparse
+from __future__ import annotations
 import time
 import pyodbc
 
@@ -28,9 +28,11 @@ from collections import defaultdict
 from sklearn.metrics.pairwise import cosine_similarity
 import shutil
 
-import re, posixpath
 import tensorflow as tf
 
+from pathlib import Path
+
+# ***************************** VisionAI *****************************
 print("""
  __   __  ___   _______  ___   _______  __    _  _______  ___  
 |  | |  ||   | |       ||   | |       ||  |  | ||   _   ||   | 
@@ -74,15 +76,17 @@ os.makedirs(THUMBNAIL_SAVE_PATH, exist_ok=True)
 
 #os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-# Load environment variables
 conn_str = SQL_CONNECTION_STRING
 thumbnail_base_path = THUMBNAIL_SAVE_PATH
 system_thumb_path = SYSTEM_THUMBNAILS_PATH
 
-# Ensure the thumbnail directory exists
 os.makedirs(thumbnail_base_path, exist_ok=True)
 os.makedirs(system_thumb_path, exist_ok=True)
 
+DEST_ROOT = os.path.join(CURRENT_DIR, "ByPerson")
+LOG_DIR_OR_FILE = os.path.join(CURRENT_DIR, "logs")  # dir or file; we handle both
+KEEP_COPY = True
+DRY_RUN = False
 # ***************************** LOGGER_CONFIG.py *****************************
 LOG_DIR = os.path.join(CURRENT_DIR, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -98,6 +102,139 @@ def get_logger(name="detection_recognition"):
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
     return logger
+
+# ***************************** Person-Wise Folder *****************************
+def get_thumb_logger(log_path: str | None, name: str = "move_thumbnails") -> logging.Logger:
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+
+    if log_path is None:
+        if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
+            sh = logging.StreamHandler()
+            sh.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+            logger.addHandler(sh)
+        return logger
+
+    p = Path(log_path)
+    if (p.exists() and p.is_dir()) or not p.suffix:
+        p = p / f"{name}.log"
+    p.parent.mkdir(parents=True, exist_ok=True)
+
+    if not any(isinstance(h, logging.FileHandler) and getattr(h, "baseFilename", None) == str(p)
+               for h in logger.handlers):
+        try:
+            fh = logging.FileHandler(p, encoding="utf-8")
+            fh.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+            logger.addHandler(fh)
+        except Exception as e:
+            # Fall back to console if file can't be opened
+            if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
+                sh = logging.StreamHandler()
+                sh.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+                logger.addHandler(sh)
+            logger.warning(f"Could not open log file '{p}': {e}. Falling back to console.")
+    return logger
+
+def move_thumbnails_by_person(
+    sql_connection_string: str,
+    thumbnail_save_path: str,
+    dest_root: str | None = None,
+    keep_copy: bool = False,
+    dry_run: bool = False,
+    log_path: str | None = None,
+) -> None:
+    logger_thumb = get_thumb_logger(log_path, "by_person_faces")
+
+    if not sql_connection_string or not isinstance(sql_connection_string, str):
+        raise ValueError(
+            "sql_connection_string is empty. Set SQL_CONNECTION_STRING in your environment/.env "
+            "or pass a non-empty string to move_thumbnails_by_person()."
+        )
+
+    src_root = Path(thumbnail_save_path).resolve()
+    if dest_root is None:
+        dest_root = src_root
+    dest_root = Path(dest_root).resolve()
+
+    try:
+        with pyodbc.connect(sql_connection_string) as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT 
+                        p.Id       AS PersonId,
+                        f.Id       AS FaceId,
+                        f.Name     AS ThumbFileName
+                    FROM dbo.Faces f
+                    INNER JOIN dbo.Persons p
+                        ON f.PersonId = p.Id
+                    WHERE f.Name IS NOT NULL AND LTRIM(RTRIM(f.Name)) <> ''
+                """)
+                rows = cur.fetchall()
+
+        if not rows:
+            print("[INFO] No faces with PersonId and thumbnail file name found.")
+            return
+        if rows:
+            table_data = [list(row) for row in rows]
+            table_headers = ["PersonId", "FaceId", "ThumbFileName"]
+            table_str = tabulate(table_data, headers=table_headers, tablefmt="grid")
+
+            # Log to logger_thumb
+            logger_thumb.info("\n" + table_str)
+
+        moved = copied = skipped_missing = skipped_errors = 0
+
+        for person_id, face_id, thumb_name in rows:
+            try:
+                src = src_root / thumb_name
+                if not src.exists():
+                    logger.warning(f"[MISS] Source thumbnail not found: {src}")
+                    skipped_missing += 1
+                    continue
+
+                person_dir = dest_root / f"Person_{int(person_id)}"
+                dst = person_dir / src.name
+
+                if dst.exists():
+                    stem, suffix = dst.stem, dst.suffix
+                    dst = person_dir / f"{stem}_Face{int(face_id)}{suffix}"
+                    k = 1
+                    while dst.exists():
+                        dst = person_dir / f"{stem}_Face{int(face_id)}_{k}{suffix}"
+                        k += 1
+
+                action = "COPY" if keep_copy else "MOVE"
+                if dry_run:
+                    print(f"[DryRun] {action}: {src}  ->  {dst}")
+                    continue
+
+                person_dir.mkdir(parents=True, exist_ok=True)
+                if keep_copy:
+                    shutil.copy2(src, dst)
+                    copied += 1
+                    logger_thumb.info(f"[COPY] PersonId={person_id}, FaceId={face_id}, File={src} -> {dst}")
+                else:
+                    shutil.move(str(src), str(dst))
+                    moved += 1
+                    logger_thumb.info(f"[MOVE] PersonId={person_id}, FaceId={face_id}, File={src} -> {dst}")
+
+            except Exception as e:
+                logger.error(f"[ERROR] Failed FaceId={face_id}, file={thumb_name}: {e}")
+                skipped_errors += 1
+
+        print(
+            f"[DONE] Persons Grouped Under: {dest_root}\n"
+            f"       moved={moved}, copied={copied}, "
+            f"missing={skipped_missing}, errors={skipped_errors}"
+        )
+        logger.info(
+            f"[GROUPED] dest_root={dest_root} moved={moved} copied={copied} "
+            f"missing={skipped_missing} errors={skipped_errors}"
+        )
+
+    except Exception as e:
+        logger.error(f"[FATAL] move_thumbnails_by_person failed: {e}")
+        print(f"[ERROR] move_thumbnails_by_person failed: {e}")    
 
 # ***************************** DETECT_FACES.py *****************************
 # logger setup
@@ -1110,6 +1247,14 @@ def automated_pipeline(interval_minutes=3, recluster=False, dry_run=False):
 
         full_pipeline_once(recluster=recluster, dry_run=dry_run)
 
+        move_thumbnails_by_person(
+            sql_connection_string=SQL_CONNECTION_STRING,
+            thumbnail_save_path=THUMBNAIL_SAVE_PATH,
+            dest_root=DEST_ROOT,
+            keep_copy=KEEP_COPY,
+            dry_run=DRY_RUN,
+            log_path=LOG_DIR_OR_FILE, 
+        )
         wait_seconds = interval_minutes * 60
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Sleeping for {interval_minutes} minutes...")
 
